@@ -1,98 +1,92 @@
 import robel
 import gym
-import pfrl
 import torch
 import torch.nn as nn
 import gym
 import numpy as np
-
-import logging
+import os
 import sys
+import datetime
+import argparse
+
 
 from modules import *
+import utils
+
+from tensorboardX import SummaryWriter
+
 
 import pdb
 
-env = gym.make('DClawTurnFixed-v0')
+def eval_policy(policy, env_name, eval_episodes=10, real_robot = False):
+	if real_robot:
+		eval_env = gym.make(env_name, device_path='/dev/tty.usbserial-FT3WI485')
+	else:
+		eval_env = gym.make(env_name)
+
+	avg_reward = 0.
+	for _ in range(eval_episodes):
+		state, done = eval_env.reset(), False
+		while not done:
+			action = policy.select_action(np.array(state), 'test')
+			state, reward, done, _ = eval_env.step(action)
+			avg_reward += reward
+		
+	avg_reward /= eval_episodes
+
+	print("---------------------------------------")
+	print("Evaluation over {} episodes: {:.3f}".format(eval_episodes, avg_reward))
+	print("---------------------------------------")
+	return avg_reward
+
+base_env = gym.make('DClawTurnFixed-v0')
 # env = gym.make('DClawTurnFixed-v0', device_path='/dev/tty.usbserial-FT3WI485')
-def burnin_action_func():
-	"""Select random actions until model is updated one or more times."""
-	return np.random.uniform(env.action_space.low, env.action_space.high).astype(np.float32)
 
 
 if __name__ == "__main__":
-	logging.basicConfig(level=logging.INFO, stream=sys.stdout, format='')
-	# Create a simulation environment for the D'Claw turn task.
-	# env = gym.make('DClawTurnFixed-v0')
+	parser = argparse.ArgumentParser()
+	parser.add_argument("--start-timesteps", type=int, default=1)
+	parser.add_argument("--max-timesteps", type=int, default=3e6)
+	parser.add_argument("--eval-freq", type = int, default = 1000)
+	args = parser.parse_args()
 
-	# Create a hardware environment for the D'Claw turn task.
-	# `device_path` refers to the device port of the Dynamixel USB device.
-	# e.g. '/dev/ttyUSB0' for Linux, '/dev/tty.usbserial-*' for Mac OS.
-	# env = gym.make('DClawTurnFixed-v0', device_path='/dev/ttyUSB0')
+	if not os.path.exists('./logs'):
+		os.system('mkdir logs')
+	if not os.path.exists('./saved_models'):
+		os.system('mkdir saved_models')
+	writer = SummaryWriter(logdir=('logs/{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
-	# Reset the environent and perform a random action.
-	obs = env.reset()
-	observation_dim = obs.shape[0]
-	action_dim = env.action_space.sample().shape[0]
+	device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
-	q_function = QFunction(observation_dim = observation_dim, action_dim = action_dim)
-	policy = Policy(observation_dim = observation_dim, action_dim = action_dim, max_action = 0.1)
+	state_dim = base_env.reset().shape[0]
+	action_dim = base_env.action_space.sample().shape[0]
+	max_action = base_env.action_space.high[0]
 
-	actor_optimizer = torch.optim.Adam(q_function.parameters(), eps=1e-2)
-	critic_optimizer = torch.optim.Adam(policy.parameters(), eps=1e-2)
-	replay_buffer = pfrl.replay_buffers.ReplayBuffer(capacity=10 ** 6)
-	explorer = pfrl.explorers.AdditiveGaussian(scale=0.1, low=env.action_space.low, high=env.action_space.high)
-	# explorer = pfrl.explorers.ConstantEpsilonGreedy(epsilon=0.3, random_action_func=env.action_space.sample)
-	gamma = 0.9
-	batch_size = 64
-	gpu = -1
-	replay_start_size = 500
-	steps = 10**6
-	phi = lambda x: x.astype(np.float32, copy=False)
+	replay_buffer = utils.ReplayBuffer(state_dim = state_dim, action_dim = action_dim, max_size=int(1e6), device=device)
+	ddpg = DDPG(state_dim = state_dim,
+	action_dim = action_dim,
+	replay_buffer = replay_buffer,
+	writer = writer,
+	max_action = max_action,
+	device = device)
+	current_state = base_env.reset()
+	for t in range(int(args.max_timesteps)):
+		if t % int(args.eval_freq) == 0:
+			avg_reward = eval_policy(ddpg, 'DClawTurnFixed-v0')
+			writer.add_scalar('/eval/avg_reward',avg_reward, t)
+		if t < int(args.start_timesteps):
+			action = base_env.action_space.sample()
+		else:
+			action = ddpg.select_action(current_state, 'train')
+		next_state, reward, done, info = base_env.step(action)
+		suc = info['score/success']
+		replay_buffer.add(current_state,action,next_state,reward,done)
+		if t > int(args.start_timesteps):
+			ddpg.train()
 
-	agent = pfrl.agents.DDPG(policy,
-		q_function,
-		actor_optimizer,
-		critic_optimizer,
-		replay_buffer,
-		gamma=0.99,
-		explorer=explorer,
-		replay_start_size=replay_start_size,
-		target_update_method="soft",
-		target_update_interval=1,
-		update_interval=1,
-		soft_update_tau=5e-3,
-		n_times_update=1,
-		gpu = gpu,
-		minibatch_size=batch_size,
-		burnin_action_func=burnin_action_func,
-		phi = phi)
-	env.render()
-	pfrl.experiments.train_agent_with_evaluation(
-            agent=agent,
-            env=env,
-            steps=steps,
-            eval_env=env,
-            eval_n_steps=None,
-            eval_n_episodes=10,
-            eval_interval=5000,
-            outdir='./results',
-            train_max_episode_len=env.spec.max_episode_steps,
-        )
-	print('Finished.')
-	# pfrl.experiments.train_agent_with_evaluation(
-	#     agent,
-	#     env,
-	#     steps=2000,           # Train the agent for 2000 steps
-	#     eval_n_steps=None,       # We evaluate for episodes, not time
-	#     eval_n_episodes=10,       # 10 episodes are sampled for each evaluation
-	#     train_max_episode_len=200,  # Maximum length of each episode
-	#     eval_interval=1000,   # Evaluate the agent after every 1000 steps
-	#     outdir='result',      # Save everything to 'result' directory
-	# )
-	# env.step(env.action_space.sample())
-
-	# for _ in range(1000):
-	#     env.render()
-	#     env.step(env.action_space.sample()) # take a random action
-	# env.close()
+		current_state = next_state
+	#obs shape (21,)
+	#action shape (9, )
+	# obs = base_env.reset() 
+	# action = base_env.action_space.sample()
+	# pdb.set_trace()
