@@ -45,9 +45,9 @@ base_env = gym.make('DClawTurnFixed-v0')
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
-	parser.add_argument("--start-timesteps", type=int, default=1)
+	parser.add_argument("--start-timesteps", type=int, default=1e4)
 	parser.add_argument("--max-timesteps", type=int, default=3e6)
-	parser.add_argument("--eval-freq", type = int, default = 1000)
+	parser.add_argument("--eval-freq", type = int, default = 2000)
 	args = parser.parse_args()
 
 	if not os.path.exists('./logs'):

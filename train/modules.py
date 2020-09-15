@@ -21,7 +21,7 @@ class Critic(torch.nn.Module):
 		hidden = F.relu(self.fc_1(hidden))
 		hidden = F.relu(self.fc_2(hidden))
 		hidden = F.relu(self.fc_3(hidden))
-		q_value = F.relu(self.fc_4(hidden))
+		q_value = self.fc_4(hidden)
 		return q_value
 
 class Actor(torch.nn.Module):
@@ -56,7 +56,7 @@ class DDPG(object):
 		hidden_size: int = 256,
 		tau = 0.005,
 		variance:float = 0.1,
-		save_freq:int = 2000):
+		save_freq:int = 4000):
 
 		self.batch_size = batch_size
 		self.gamma = gamma
@@ -92,19 +92,20 @@ class DDPG(object):
 		return action
 	def save_model(self):
 		print('saving...')
-		torch.save(self.actor.cpu().state_dict(),'./saved_models/actor_{:05d}.ckpt'.format(self.index))
-		torch.save(self.critic.cpu().state_dict(),'./saved_models/critic_{:05d}.ckpt'.format(self.index))
+		torch.save(self.actor.cpu().state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
+		torch.save(self.critic.cpu().state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
 		print('finish saving')
 	def restore_model(self, index):
 		self.index = index
-		self.actor.load_state_dict('./saved_models/actor_{:05d}.ckpt'.format(index))
-		self.critic.load_state_dict('./saved_models/critic_{:05d}.ckpt'.format(index))
+		self.actor.load_state_dict('./saved_models/actor_{:07d}.ckpt'.format(index))
+		self.critic.load_state_dict('./saved_models/critic_{:07d}.ckpt'.format(index))
 		print('finish restoring model')
 
 	def train(self):
 		self.index += 1
 		current_state, action, next_state, reward, not_done = self.replay_buffer.sample(self.batch_size)
-		target = reward + self.gamma * not_done * self.critic_target(next_state, self.actor_target(next_state))
+		with torch.no_grad():
+			target = reward + self.gamma * not_done * self.critic_target(next_state, self.actor_target(next_state))
 		current_q = self.critic(current_state, action)
 		critic_loss = self.mse_loss(current_q, target)
 		
