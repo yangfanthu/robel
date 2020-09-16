@@ -55,7 +55,7 @@ class DDPG(object):
 		max_action:float = 1., 
 		hidden_size: int = 256,
 		tau = 0.005,
-		variance:float = 0.1,
+		variance:float = 0.3,
 		save_freq:int = 4000):
 
 		self.batch_size = batch_size
@@ -97,8 +97,8 @@ class DDPG(object):
 		print('finish saving')
 	def restore_model(self, index):
 		self.index = index
-		self.actor.load_state_dict('./saved_models/actor_{:07d}.ckpt'.format(index))
-		self.critic.load_state_dict('./saved_models/critic_{:07d}.ckpt'.format(index))
+		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index)))
+		self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index)))
 		print('finish restoring model')
 
 	def train(self):
@@ -123,6 +123,7 @@ class DDPG(object):
 		self.writer.add_scalar('./train/actor_loss', actor_loss.cpu().item(), self.index)
 		self.writer.add_scalar('./train/current_q', current_q.cpu().mean().item(), self.index)
 		self.writer.add_scalar('./train/reward_max', reward.max().cpu().item(), self.index)
+		self.writer.add_scalar('./train/reward_mean', reward.mean().cpu().item(), self.index)
 		self.writer.add_scalar('./train/actor_q', -actor_loss.cpu().item(), self.index)
 
 
