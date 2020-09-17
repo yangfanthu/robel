@@ -40,7 +40,7 @@ class Actor(torch.nn.Module):
 		hidden = F.relu(self.fc_1(state))
 		hidden = F.relu(self.fc_2(hidden))
 		hidden = F.relu(self.fc_3(hidden))
-		hidden = F.relu(self.fc_4(hidden))
+		hidden = self.fc_4(hidden)
 		action = torch.tanh(hidden) * self.max_action
 		return action
 
@@ -50,7 +50,8 @@ class DDPG(object):
 		action_dim:int, 
 		replay_buffer: utils.ReplayBuffer,
 		device, 
-		writer, gamma:float = 0.9, 
+		writer, 
+		gamma:float = 0.99, 
 		batch_size:int = 64, 
 		max_action:float = 1., 
 		hidden_size: int = 256,

@@ -70,8 +70,10 @@ if __name__ == "__main__":
 	action_dim = action_dim,
 	replay_buffer = replay_buffer,
 	writer = writer,
+	gamma = 0.99,
 	max_action = max_action,
-	device = device)
+	device = device,
+	hidden_size=400)
 	current_state = base_env.reset()
 	episode = 0
 	for t in range(int(args.max_timesteps)):

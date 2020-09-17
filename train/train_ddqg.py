@@ -145,6 +145,27 @@ def main():
         BoundByTanh(low=action_space.low, high=action_space.high),
         DeterministicHead(),
     )
+    # q_func = nn.Sequential(
+    #     ConcatObsAndAction(),
+    #     nn.Linear(obs_size + action_size, 256),
+    #     nn.ReLU(),
+    #     nn.Linear(256, 256),
+    #     nn.ReLU(),
+    #     nn.Linear(256,256),
+    #     nn.ReLU(),
+    #     nn.Linear(256, 1),
+    # )
+    # policy = nn.Sequential(
+    #     nn.Linear(obs_size, 256),
+    #     nn.ReLU(),
+    #     nn.Linear(256, 256),
+    #     nn.ReLU(),
+    #     nn.Linear(256,256),
+    #     nn.ReLU(),
+    #     nn.Linear(256, action_size),
+    #     BoundByTanh(low=action_space.low, high=action_space.high),
+    #     DeterministicHead(),
+    # )
 
     opt_a = torch.optim.Adam(policy.parameters())
     opt_c = torch.optim.Adam(q_func.parameters())
@@ -200,7 +221,7 @@ def main():
             env=eval_env,
             agent=agent,
             n_steps=None,
-            n_episodes=args.eval_n_runs,
+            n_episodes=args.eval_n_runbase_envs,
             max_episode_len=timestep_limit,
         )
         print(

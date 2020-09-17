@@ -30,8 +30,9 @@ if __name__ == "__main__":
 	replay_buffer = None,
 	writer = None,
 	max_action = max_action,
-	device = device)
-	ddpg.restore_model(2988000)
+	device = device,
+	hidden_size=400)
+	ddpg.restore_model(184000)
 	current_state = env.reset()
 	env.render()
 	sum_reward = 0
