@@ -31,14 +31,19 @@ if __name__ == "__main__":
 	writer = None,
 	max_action = max_action,
 	device = device)
-	ddpg.restore_model(448000)
+	ddpg.restore_model(2988000)
 	current_state = env.reset()
 	env.render()
-
+	sum_reward = 0
 	while True:
 		action = ddpg.select_action(current_state, 'test')
 		next_state, reward, done, info = env.step(action)
+		sum_reward += reward 
+		# print(sum_reward)
 		suc = info['score/success']
+		
 		current_state = next_state
 		if done:
 			current_state = env.reset()
+			print(sum_reward)
+			sum_reward = 0

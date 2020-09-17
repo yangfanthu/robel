@@ -55,8 +55,8 @@ class DDPG(object):
 		max_action:float = 1., 
 		hidden_size: int = 256,
 		tau = 0.005,
-		variance:float = 0.3,
-		save_freq:int = 4000):
+		variance:float = 0.1,
+		save_freq:int = 8000):
 
 		self.batch_size = batch_size
 		self.gamma = gamma
@@ -69,10 +69,11 @@ class DDPG(object):
 		self.action_dim = action_dim
 		self.state_dim	= state_dim
 		self.save_freq = save_freq
-		self.critic = Critic(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size)
-		self.critic_target = copy.deepcopy(self.critic)
-		self.actor = Actor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, max_action = max_action)
-		self.actor_target = copy.deepcopy(self.actor)
+		self.critic = Critic(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size).to(device)
+		self.critic_target = copy.deepcopy(self.critic).to(device)
+		self.actor = Actor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, max_action = max_action).to(device)
+		self.actor_target = copy.deepcopy(self.actor).to(device)
+
 		self.mse_loss = nn.MSELoss()
 		self.index = 0
 		self.writer = writer
@@ -81,19 +82,23 @@ class DDPG(object):
 		self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr = 1e-3)
 
 	def select_action(self, state, mode = "train"):
+		temp_state = state
 		state = torch.tensor(state).float().to(self.device)
 		with torch.no_grad():
 			if mode == "train":
-				action = self.actor(state).detach().numpy()
+				action = self.actor(state).cpu().detach().numpy()
 				noise = np.random.normal(0,self.variance,self.action_dim)
 				action = action + noise
 			elif mode == "test":
-				action = self.actor(state).detach().numpy()
+				action = self.actor(state).cpu().detach().numpy()
+		action = np.clip(action, -self.max_action, self.max_action)
 		return action
 	def save_model(self):
 		print('saving...')
 		torch.save(self.actor.cpu().state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
 		torch.save(self.critic.cpu().state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
+		self.actor.to(self.device)
+		self.critic.to(self.device)
 		print('finish saving')
 	def restore_model(self, index):
 		self.index = index
@@ -114,17 +119,17 @@ class DDPG(object):
 		critic_loss.backward()
 		self.critic_optimizer.step()
 
-		actor_loss = -self.critic(current_state, self.actor(current_state)).mean()
+		actor_loss = - self.critic(current_state, self.actor(current_state)).mean()
 		self.actor_optimizer.zero_grad()
 		actor_loss.backward()
 		self.actor_optimizer.step()
 
-		self.writer.add_scalar('./train/critic_loss',critic_loss.cpu().item(), self.index)
-		self.writer.add_scalar('./train/actor_loss', actor_loss.cpu().item(), self.index)
-		self.writer.add_scalar('./train/current_q', current_q.cpu().mean().item(), self.index)
-		self.writer.add_scalar('./train/reward_max', reward.max().cpu().item(), self.index)
-		self.writer.add_scalar('./train/reward_mean', reward.mean().cpu().item(), self.index)
-		self.writer.add_scalar('./train/actor_q', -actor_loss.cpu().item(), self.index)
+		self.writer.add_scalar('./train/critic_loss',critic_loss.item(), self.index)
+		self.writer.add_scalar('./train/actor_loss', actor_loss.item(), self.index)
+		self.writer.add_scalar('./train/current_q', current_q.mean().item(), self.index)
+		self.writer.add_scalar('./train/reward_max', reward.max().item(), self.index)
+		self.writer.add_scalar('./train/reward_mean', reward.mean().item(), self.index)
+		self.writer.add_scalar('./train/actor_q', -actor_loss.item(), self.index)
 
 
 		for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):

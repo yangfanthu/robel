@@ -18,11 +18,13 @@ from tensorboardX import SummaryWriter
 
 import pdb
 
-def eval_policy(policy, env_name, eval_episodes=10, real_robot = False):
+def eval_policy(policy, env_name, eval_episodes=10, real_robot = False, seed = 0):
+	env_seed = 2 ** 32 - 1 - seed
 	if real_robot:
 		eval_env = gym.make(env_name, device_path='/dev/tty.usbserial-FT3WI485')
 	else:
 		eval_env = gym.make(env_name)
+	eval_env.seed(env_seed)
 
 	avg_reward = 0.
 	for _ in range(eval_episodes):
@@ -47,16 +49,17 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--start-timesteps", type=int, default=1e4)
 	parser.add_argument("--max-timesteps", type=int, default=3e6)
-	parser.add_argument("--eval-freq", type = int, default = 2000)
+	parser.add_argument("--eval-freq", type = int, default = 8000)
+	parser.add_argument("--seed", type = int, default=0)
 	args = parser.parse_args()
-
+	base_env.seed(args.seed)
 	if not os.path.exists('./logs'):
 		os.system('mkdir logs')
 	if not os.path.exists('./saved_models'):
 		os.system('mkdir saved_models')
 	writer = SummaryWriter(logdir=('logs/{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
-	device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 	state_dim = base_env.reset().shape[0]
 	action_dim = base_env.action_space.sample().shape[0]
@@ -70,8 +73,14 @@ if __name__ == "__main__":
 	max_action = max_action,
 	device = device)
 	current_state = base_env.reset()
+	episode = 0
 	for t in range(int(args.max_timesteps)):
+		if t == int(args.start_timesteps):
+			print("start learning")
 		if t % int(args.eval_freq) == 0:
+			print("-------------------------------------------")
+			print("steps:{:07d}".format(t))
+			print("episode:{:07d}".format(episode))
 			avg_reward = eval_policy(ddpg, 'DClawTurnFixed-v0')
 			writer.add_scalar('/eval/avg_reward',avg_reward, t)
 		if t < int(args.start_timesteps):
@@ -83,10 +92,7 @@ if __name__ == "__main__":
 		replay_buffer.add(current_state,action,next_state,reward,done)
 		if t > int(args.start_timesteps):
 			ddpg.train()
-
 		current_state = next_state
-	#obs shape (21,)
-	#action shape (9, )
-	# obs = base_env.reset() 
-	# action = base_env.action_space.sample()
-	# pdb.set_trace()
+		if done:
+			current_state = base_env.reset()
+			episode += 1
