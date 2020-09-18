@@ -73,7 +73,7 @@ if __name__ == "__main__":
 	gamma = 0.99,
 	max_action = max_action,
 	device = device,
-	hidden_size=400)
+	hidden_size=256)
 	current_state = base_env.reset()
 	episode = 0
 	for t in range(int(args.max_timesteps)):

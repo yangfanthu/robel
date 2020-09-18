@@ -110,18 +110,19 @@ class DDPG(object):
 	def train(self):
 		self.index += 1
 		current_state, action, next_state, reward, not_done = self.replay_buffer.sample(self.batch_size)
+		
+		self.critic_optimizer.zero_grad()
 		with torch.no_grad():
 			target = reward + self.gamma * not_done * self.critic_target(next_state, self.actor_target(next_state))
 		current_q = self.critic(current_state, action)
-		critic_loss = self.mse_loss(current_q, target)
+		critic_loss = self.mse_loss(target, current_q)
 		
 
-		self.critic_optimizer.zero_grad()
 		critic_loss.backward()
 		self.critic_optimizer.step()
 
-		actor_loss = - self.critic(current_state, self.actor(current_state)).mean()
 		self.actor_optimizer.zero_grad()
+		actor_loss = - self.critic(current_state, self.actor(current_state)).mean()
 		actor_loss.backward()
 		self.actor_optimizer.step()
 
