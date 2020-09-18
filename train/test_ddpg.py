@@ -124,7 +124,17 @@ if __name__ == "__main__":
 	obs_size = obs_space.low.size
 	action_size = action_space.low.size
 
-	policy = nn.Sequential(nn.Sequential(
+	q_func = nn.Sequential(
+        ConcatObsAndAction(),
+        nn.Linear(obs_size + action_size, 400),
+        nn.ReLU(),
+        nn.Linear(400, 300),
+        nn.ReLU(),
+        nn.Linear(300,300),
+        nn.ReLU(),
+        nn.Linear(300, 1),
+    )
+    policy = nn.Sequential(
         nn.Linear(obs_size, 400),
         nn.ReLU(),
         nn.Linear(400, 300),
@@ -134,19 +144,10 @@ if __name__ == "__main__":
         nn.Linear(300, action_size),
         BoundByTanh(low=action_space.low, high=action_space.high),
         DeterministicHead(),
-    ))
-	model_param = torch.load('./results/best/model.pt')
-	model_param.pop("1.1.weight")
-	model_param.pop("1.1.bias")
-	model_param.pop("1.3.weight")
-	model_param.pop("1.3.bias")
-	model_param.pop("1.5.weight")
-	model_param.pop("1.5.bias")
-	model_param.pop("1.7.weight")
-	model_param.pop("1.7.bias")
-	
-	policy.load_state_dict(model_param)
-	policy = policy[0]
+    )
+	model = nn.ModuleList([policy, q_func])
+	model.load_state_dict("./results/best/model.pt")
+	policy = model[0]
 
 	print("finish loading")
 
@@ -157,6 +158,7 @@ if __name__ == "__main__":
 			env.render()
 			observation = torch.tensor(observation).float()
 			action = policy(observation)
+			action = np.array(action)
 			observation, reward, done, info = env.step(action)
 			if done:
 				print("Episode finished after {} timesteps".format(t+1))

@@ -72,8 +72,10 @@ class DDPG(object):
 		self.save_freq = save_freq
 		self.critic = Critic(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size).to(device)
 		self.critic_target = copy.deepcopy(self.critic).to(device)
+		self.critic_target.eval()
 		self.actor = Actor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, max_action = max_action).to(device)
 		self.actor_target = copy.deepcopy(self.actor).to(device)
+		self.actor_target.eval()
 
 		self.mse_loss = nn.MSELoss()
 		self.index = 0

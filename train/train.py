@@ -49,7 +49,8 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--start-timesteps", type=int, default=1e4)
 	parser.add_argument("--max-timesteps", type=int, default=3e6)
-	parser.add_argument("--eval-freq", type = int, default = 8000)
+	parser.add_argument("--eval-freq", type = int, default = 5000)
+	parser.add_argument("--save-freq", type = int, default = 5000)
 	parser.add_argument("--seed", type = int, default=0)
 	args = parser.parse_args()
 	base_env.seed(args.seed)
@@ -70,10 +71,11 @@ if __name__ == "__main__":
 	action_dim = action_dim,
 	replay_buffer = replay_buffer,
 	writer = writer,
-	gamma = 0.99,
+	gamma = 0.9,
 	max_action = max_action,
 	device = device,
-	hidden_size=256)
+	hidden_size=512,
+	save_freq=args.save_freq)
 	current_state = base_env.reset()
 	episode = 0
 	for t in range(int(args.max_timesteps)):
