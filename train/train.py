@@ -1,3 +1,4 @@
+"the code only with ddpg, in order to check the difference between my code and pfrl"
 import robel
 import gym
 import torch
