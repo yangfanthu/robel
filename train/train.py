@@ -49,9 +49,10 @@ if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
 	parser.add_argument("--start-timesteps", type=int, default=1e4)
 	parser.add_argument("--max-timesteps", type=int, default=3e6)
-	parser.add_argument("--eval-freq", type = int, default = 5000)
-	parser.add_argument("--save-freq", type = int, default = 5000)
-	parser.add_argument("--seed", type = int, default=0)
+	parser.add_argument("--eval-freq", type=int, default=5000)
+	parser.add_argument("--save-freq", type=int, default=5000)
+	parser.add_argument("--seed", type=int, default=0)
+	parser.add_argument("--buffer-max-size",type=int,default=int(1e6))
 	args = parser.parse_args()
 	base_env.seed(args.seed)
 	if not os.path.exists('./logs'):
@@ -66,14 +67,13 @@ if __name__ == "__main__":
 	action_dim = base_env.action_space.sample().shape[0]
 	max_action = base_env.action_space.high[0]
 
-	replay_buffer = utils.ReplayBuffer(state_dim = state_dim, action_dim = action_dim, max_size=int(1e6), device=device)
-	ddpg = DDPG(state_dim = state_dim,
-	action_dim = action_dim,
-	replay_buffer = replay_buffer,
-	writer = writer,
-	gamma = 0.9,
-	max_action = max_action,
-	device = device,
+	ddpg = DDPG(state_dim=state_dim,
+	action_dim=action_dim,
+	buffer_max_size=args.buffer_max_size,
+	writer=writer,
+	gamma=0.9,
+	max_action=max_action,
+	device=device,
 	hidden_size=512,
 	save_freq=args.save_freq)
 	current_state = base_env.reset()
@@ -93,7 +93,7 @@ if __name__ == "__main__":
 			action = ddpg.select_action(current_state, 'train')
 		next_state, reward, done, info = base_env.step(action)
 		suc = info['score/success']
-		replay_buffer.add(current_state,action,next_state,reward,done)
+		ddpg.add_buffer(current_state,action,next_state,reward,done)
 		if t > int(args.start_timesteps):
 			ddpg.train()
 		current_state = next_state
