@@ -103,12 +103,10 @@ class DDPG(object):
 		return action
 	def save_model(self):
 		print('saving...')
-		torch.save(self.actor.cpu().state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
-		torch.save(self.critic.cpu().state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
+		torch.save(self.actor.state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
+		torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
 		torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
 		torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
-		self.actor.to(self.device)
-		self.critic.to(self.device)
 		print('finish saving')
 	def restore_model(self, index):
 		self.index = index
@@ -166,7 +164,7 @@ class AdversarialDQN(object):
 		gamma=0.9,
 		tau=5e-3,
 		save_freq=2000,
-		record_freq=100):
+		record_freq=1000):
 
 		self.state_dim = state_dim # state space is the same as the ddpg agent
 		self.n_actions = n_actions
@@ -189,15 +187,24 @@ class AdversarialDQN(object):
 	def add_buffer(self,current_state,action,next_state,reward,done):
 		self.replay_buffer.add(current_state,action,next_state,reward,done)
 	def select_action(self, state, mode = "train"):
-		dice = random.random()
-		if dice < self.epsilon:
-			action = np.random.randint(low = 0,high = self.n_actions, size = 1)
-		else:
-			scores = [self.q_function(torch.tensor(action)).cpu().item() for action in range(n_actions)]
-			scores = np.array(scores)
-			action = np.where(scores == scores.max())[0]
+		state = torch.tensor(state).float().to(self.device)
+		scores = [self.q_function(state, torch.tensor([action]).float().to(self.device)).cpu().item() for action in range(self.n_actions)]
+		scores = np.array(scores)
+		action = np.where(scores == scores.max())[0][0]
+		action = np.array([action])
+		if mode == "train":
+			dice = random.random()
+			if dice < self.epsilon:
+				action = np.random.randint(low = 0,high = self.n_actions, size = 1)
+		# if dice < self.epsilon:
+		# 	action = np.random.randint(low = 0,high = self.n_actions, size = 1)
+		# else:
+		# 	scores = [self.q_function(state, torch.tensor([action]).float().to(self.device)).cpu().item() for action in range(self.n_actions)]
+		# 	scores = np.array(scores)
+		# 	action = np.where(scores == scores.max())[0][0]
+		# 	action = np.array([action])
 		return action
-	def __select_action_target(self, state):
+	def select_action_target(self, state):
 		# scores = []
 		# for current_action in range(self.n_actions):
 		# 	batch_action = np.ones((self.batch_size, 1)) * current_action
@@ -205,22 +212,21 @@ class AdversarialDQN(object):
 		# 	current_score = self.q_function(state, batch_action).cpu()
 		# 	scores.append(current_score)
 		# pdb.set_trace()
-		scores = [np.array(self.q_function(state, torch.tensor(np.ones((self.batch_size, 1)) * action).float()).cpu())for action in range(self.n_actions)]
+		scores = [np.array(self.q_target(state, torch.tensor(np.ones((self.batch_size, 1))*action).float().to(self.device)).cpu())for action in range(self.n_actions)]
 		scores = np.array(scores)
 		scores = scores.transpose(1,0,2)
 		max_scores = scores.max(1)
 		action_list = []
 		for i in range(self.batch_size):
-			action = np.where(scores[i]==max_scores[i])[0]
-			action_list.append(action)
+			action_loc = np.where(scores[i]==max_scores[i])[0][0]
+			action_list.append(action_loc)
 		action = np.array(action_list)
-		action = torch.tensor(action).float().to(self.device)
+		action = torch.tensor(action).float().unsqueeze(1).to(self.device)
 		return action
 	def save_model(self):
 		print("saving the adversarial q function....")
-		torch.save(self.q_function.cpu().state_dict(),'./saved_models/advesaral_q_{:07d}.ckpt'.format(self.index))
-		torch.save(self.q_function_target.cpu().state_dict(),'./saved_models/advesaral_q_target_{:07d}.ckpt'.format(self.index))
-		self.q_function.to(self.device)
+		torch.save(self.q_function.state_dict(),'./saved_models/advesaral_q_{:07d}.ckpt'.format(self.index))
+		torch.save(self.q_target.state_dict(),'./saved_models/advesaral_q_target_{:07d}.ckpt'.format(self.index))
 		print("finish saving the advesarial model")
 	def restore_model(self, index):
 		self.index = index
@@ -234,9 +240,17 @@ class AdversarialDQN(object):
 		self.optimizer.zero_grad()
 		
 		with torch.no_grad():
-			target = reward + self.gamma * not_done * self.q_target(next_state, self.__select_action_target(next_state))
+			target = reward + self.gamma * not_done * self.q_target(next_state, self.select_action_target(next_state))
+			# try:
+			# 	target = reward + self.gamma * not_done * self.q_target(next_state, self.select_action_target(next_state))
+			# except:
+			# 	print(self.select_action_target(next_state))
+			# 	print(next_state.shape)
+			# 	print(reward.shape)
+			# 	print(not_done.shape)
+			# 	pdb.set_trace()
 		current_q = self.q_function(current_state, action)
-		loss = self.criterion(target, current_q)
+		loss = self.criterion(current_q, target)
 
 		loss.backward()
 		self.optimizer.step()

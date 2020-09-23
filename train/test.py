@@ -27,17 +27,20 @@ if __name__ == "__main__":
 
 	ddpg = DDPG(state_dim = state_dim,
 	action_dim = action_dim,
-	replay_buffer = None,
+	buffer_max_size=int(1e6),
 	writer = None,
 	max_action = max_action,
 	device = device,
-	hidden_size=400)
-	ddpg.restore_model(184000)
+	hidden_size=512)
+	ddpg.restore_model(2980000)
 	current_state = env.reset()
 	env.render()
 	sum_reward = 0
 	while True:
 		action = ddpg.select_action(current_state, 'test')
+		# action[0] = -0.2
+		# action[1] = -0.2
+		# action[2] = -0.2
 		next_state, reward, done, info = env.step(action)
 		sum_reward += reward 
 		# print(sum_reward)

@@ -124,43 +124,64 @@ if __name__ == "__main__":
 	obs_size = obs_space.low.size
 	action_size = action_space.low.size
 
+	# q_func = nn.Sequential(
+    #     ConcatObsAndAction(),
+    #     nn.Linear(obs_size + action_size, 400),
+    #     nn.ReLU(),
+    #     nn.Linear(400, 300),
+    #     nn.ReLU(),
+    #     nn.Linear(300,300),
+    #     nn.ReLU(),
+    #     nn.Linear(300, 1),
+    # )
+	# policy = nn.Sequential(
+	# 	nn.Linear(obs_size, 400),
+	# 	nn.ReLU(),
+	# 	nn.Linear(400, 300),
+	# 	nn.ReLU(),
+	# 	nn.Linear(300,300),
+	# 	nn.ReLU(),
+	# 	nn.Linear(300, action_size),
+	# 	BoundByTanh(low=action_space.low, high=action_space.high),
+	# 	DeterministicHead(),
+    # )
 	q_func = nn.Sequential(
         ConcatObsAndAction(),
-        nn.Linear(obs_size + action_size, 400),
+        nn.Linear(obs_size + action_size, 512),
         nn.ReLU(),
-        nn.Linear(400, 300),
+        nn.Linear(512, 512),
         nn.ReLU(),
-        nn.Linear(300,300),
+        nn.Linear(512,512),
         nn.ReLU(),
-        nn.Linear(300, 1),
+        nn.Linear(512, 1),
     )
-    policy = nn.Sequential(
-        nn.Linear(obs_size, 400),
-        nn.ReLU(),
-        nn.Linear(400, 300),
-        nn.ReLU(),
-        nn.Linear(300,300),
-        nn.ReLU(),
-        nn.Linear(300, action_size),
-        BoundByTanh(low=action_space.low, high=action_space.high),
-        DeterministicHead(),
+	policy = nn.Sequential(
+		nn.Linear(obs_size, 512),
+		nn.ReLU(),
+		nn.Linear(512, 512),
+		nn.ReLU(),
+		nn.Linear(512,512),
+		nn.ReLU(),
+		nn.Linear(512, action_size),
+		BoundByTanh(low=action_space.low, high=action_space.high),
+		DeterministicHead(),
     )
 	model = nn.ModuleList([policy, q_func])
-	model.load_state_dict("./results/best/model.pt")
+	model.load_state_dict(torch.load("./results/best/model.pt"))
 	policy = model[0]
 
 	print("finish loading")
 
-
-	for i_episode in range(20):
-		observation = env.reset()
-		for t in range(100):
-			env.render()
-			observation = torch.tensor(observation).float()
-			action = policy(observation)
-			action = np.array(action)
-			observation, reward, done, info = env.step(action)
-			if done:
-				print("Episode finished after {} timesteps".format(t+1))
-				break
+	with torch.no_grad():
+		for i_episode in range(20):
+			observation = env.reset()
+			for t in range(100):
+				env.render()
+				observation = torch.tensor(observation).float()
+				action = policy(observation).rsample()
+				action = np.array(action)
+				observation, reward, done, info = env.step(action)
+				if done:
+					print("Episode finished after {} timesteps".format(t+1))
+					break
 	env.close()
