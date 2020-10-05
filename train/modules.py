@@ -448,7 +448,10 @@ class RDPG(object):
 		self.critic_optimizer.step()
 
 		self.actor_optimizer.zero_grad()
-		actor_loss = - self.critic(current_state, self.actor(current_state)).mean()
+		# actor_loss = - self.critic(current_state, self.actor(current_state)).mean()
+		actor_loss = - self.critic(current_state, self.actor(current_state))
+		actor_loss = actor_loss * mask
+		actor_loss = actor_loss.mean()
 		actor_loss.backward()
 		self.actor_optimizer.step()
 
