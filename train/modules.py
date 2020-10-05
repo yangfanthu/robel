@@ -438,7 +438,7 @@ class RDPG(object):
 		with torch.no_grad():
 			target = reward + self.gamma * not_done * self.critic_target(next_state, self.actor_target(next_state))
 		current_q = self.critic(current_state, action) #shape[batch_size(64), timesteps, 1]
-		mask = utils.generate_mask(episode_t, self.max_episode_timesteps)
+		mask = utils.generate_mask(episode_t, self.max_episode_timesteps).to(self.device)
 		mask = mask.unsqueeze(2)
 		current_q = current_q * mask
 		target = target * mask
