@@ -1,14 +1,15 @@
+import os
+import sys
+import copy
+import datetime
+import collections
 import robel
 import gym
 import torch
 import torch.nn as nn
 import gym
 import numpy as np
-import os
-import sys
-import datetime
 import argparse
-import collections
 
 
 from modules import *
@@ -210,7 +211,7 @@ if __name__ == "__main__":
 				original_action = adversarial_env.action_space.sample()
 			else:
 				original_action = adversarial_env.ddpg.select_action(current_state, 'train')
-			action = original_action
+			action = copy.deepcopy(original_action)
 			if ddpg_t % args.broken_timesteps == 0:
 				adversary_action = adversary.select_action(current_state,'test')
 				broken_joints.append(adversary_action[0])
