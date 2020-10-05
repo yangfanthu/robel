@@ -15,6 +15,7 @@ import pdb
 
 env = gym.make('DClawTurnFixed-v0')
 max_episode_steps = env._max_episode_steps
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # env = gym.make('DClawTurnFixed-v0', device_path='/dev/tty.usbserial-FT3WI485')
 
 def eval_policy(policy, env_name, eval_episodes=10, real_robot = False, seed = 0):

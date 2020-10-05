@@ -46,7 +46,7 @@ class Actor(torch.nn.Module):
 		return action
 
 class RecurrentCritic(torch.nn.Module):
-	def __init__(self, state_dim: int , action_dim: int, hidden_size: int = 256):
+	def __init__(self, state_dim: int , action_dim: int, device, hidden_size: int = 256):
 		super(RecurrentCritic, self).__init__()
 		self.state_dim = state_dim
 		self.action_dim	= action_dim
@@ -55,6 +55,7 @@ class RecurrentCritic(torch.nn.Module):
 		self.fc_2 = nn.Linear(hidden_size, hidden_size)
 		self.fc_3 = nn.Linear(hidden_size, hidden_size)
 		self.fc_4 = nn.Linear(hidden_size, 1)
+		self.device = device
 		self.gru = nn.GRU(input_size=hidden_size, hidden_size=hidden_size, num_layers=1, batch_first=True)
 
 	def forward(self, state, action):
@@ -62,7 +63,7 @@ class RecurrentCritic(torch.nn.Module):
 		hidden = torch.cat((state, action), dim=-1)
 		hidden = F.relu(self.fc_1(hidden))
 		hidden = F.relu(self.fc_2(hidden))
-		gru_hidden = torch.zeros(1, state.shape[0], self.hidden_size)
+		gru_hidden = torch.zeros(1, state.shape[0], self.hidden_size).to(self.device)
 		gru_output, hidden = self.gru(hidden, gru_hidden)
 		# gru_output = gru_output[:, -1]
 
@@ -71,12 +72,13 @@ class RecurrentCritic(torch.nn.Module):
 		return q_value
 
 class RecurrentActor(torch.nn.Module):
-	def __init__(self, state_dim: int, action_dim:int, max_action:float = 1.,hidden_size: int = 256):
+	def __init__(self, state_dim: int, action_dim:int, device, max_action:float = 1.,hidden_size: int = 256):
 		super(RecurrentActor, self).__init__()
 		self.max_action = max_action
 		self.state_dim = state_dim
 		self.action_dim	= action_dim
 		self.hidden_size = hidden_size
+		self.device = device
 
 		self.fc_1 = nn.Linear(state_dim, hidden_size)
 		self.fc_2 = nn.Linear(hidden_size, hidden_size)
@@ -87,7 +89,7 @@ class RecurrentActor(torch.nn.Module):
 		hidden = F.relu(self.fc_1(state))
 		hidden = F.relu(self.fc_2(hidden))
 		# gru_hidden = torch.zeros((state.shape[0], 1, self.hidden_size))
-		gru_hidden = torch.zeros((1, state.shape[0], self.hidden_size))
+		gru_hidden = torch.zeros((1, state.shape[0], self.hidden_size)).to(self.device)
 		gru_output, hidden = self.gru(hidden, gru_hidden)
 		# gru_output = gru_output[:, -1]
 		hidden = F.relu(self.fc_3(gru_output))
@@ -99,7 +101,7 @@ class RecurrentActor(torch.nn.Module):
 		state = state.unsqueeze(0)
 		hidden = F.relu(self.fc_1(state))
 		hidden = F.relu(self.fc_2(hidden))
-		gru_hidden = torch.zeros((1, 1, self.hidden_size))
+		gru_hidden = torch.zeros((1, 1, self.hidden_size)).to(self.device)
 		gru_output, hidden = self.gru(hidden, gru_hidden)
 		gru_output = gru_output[:, -1]
 		hidden = F.relu(self.fc_3(gru_output))
@@ -374,10 +376,10 @@ class RDPG(object):
 		self.state_dim	= state_dim
 		self.save_freq = save_freq
 		self.record_freq = record_freq
-		self.critic = RecurrentCritic(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size).to(device)
+		self.critic = RecurrentCritic(state_dim = state_dim, action_dim = action_dim, device=device, hidden_size = hidden_size).to(device)
 		self.critic_target = copy.deepcopy(self.critic).to(device)
 		self.critic_target.eval()
-		self.actor = RecurrentActor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, max_action = max_action).to(device)
+		self.actor = RecurrentActor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, device=device, max_action = max_action).to(device)
 		self.actor_target = copy.deepcopy(self.actor).to(device)
 		self.actor_target.eval()
 
