@@ -59,7 +59,8 @@ class DDPG(object):
 		tau = 0.005,
 		variance:float = 0.1,
 		save_freq:int = 8000,
-		record_freq:int=100):
+		record_freq:int=100,
+		outdir = None):
 
 		self.batch_size = batch_size
 		self.gamma = gamma
@@ -86,6 +87,7 @@ class DDPG(object):
 		learning_rate = 1e-3
 		self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr = 1e-3)
 		self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr = 1e-3)
+		self.outdir = outdir
 
 	def add_buffer(self,current_state,action,next_state,reward,done):
 		self.replay_buffer.add(current_state,action,next_state,reward,done)
@@ -103,10 +105,16 @@ class DDPG(object):
 		return action
 	def save_model(self):
 		print('saving...')
-		torch.save(self.actor.state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
-		torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
-		torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
-		torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
+		if self.outdir != None:
+			torch.save(self.actor.state_dict(),self.outdir + '/actor_{:07d}.ckpt'.format(self.index))
+			torch.save(self.critic.state_dict(),self.outdir + '/critic_{:07d}.ckpt'.format(self.index))
+			torch.save(self.actor_target.state_dict(),self.outdir + '/actor_target_{:07d}.ckpt'.format(self.index))
+			torch.save(self.critic_target.state_dict(),self.outdir + '/critic_target_{:07d}.ckpt'.format(self.index))
+		else:
+			torch.save(self.actor.state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
+			torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
+			torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
+			torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
 		print('finish saving')
 	def restore_model(self, index):
 		self.index = index
@@ -133,7 +141,7 @@ class DDPG(object):
 		actor_loss.backward()
 		self.actor_optimizer.step()
 
-		if self.index % self.record_freq == 0:
+		if self.index % self.record_freq == 0 and self.writer != None:
 			self.writer.add_scalar('./train/critic_loss',critic_loss.item(), self.index)
 			self.writer.add_scalar('./train/actor_loss', actor_loss.item(), self.index)
 			self.writer.add_scalar('./train/current_q', current_q.mean().item(), self.index)
@@ -164,7 +172,8 @@ class AdversarialDQN(object):
 		gamma=0.9,
 		tau=5e-3,
 		save_freq=2000,
-		record_freq=1000):
+		record_freq=1000,
+		outdir=None):
 
 		self.state_dim = state_dim # state space is the same as the ddpg agent
 		self.n_actions = n_actions
@@ -184,6 +193,7 @@ class AdversarialDQN(object):
 		self.record_freq = record_freq
 		self.save_freq = save_freq
 		self.criterion = torch.nn.MSELoss()
+		self.outdir = outdir
 	def add_buffer(self,current_state,action,next_state,reward,done):
 		self.replay_buffer.add(current_state,action,next_state,reward,done)
 	def select_action(self, state, mode = "train"):
@@ -225,8 +235,12 @@ class AdversarialDQN(object):
 		return action
 	def save_model(self):
 		print("saving the adversarial q function....")
-		torch.save(self.q_function.state_dict(),'./saved_models/advesaral_q_{:07d}.ckpt'.format(self.index))
-		torch.save(self.q_target.state_dict(),'./saved_models/advesaral_q_target_{:07d}.ckpt'.format(self.index))
+		if self.outdir != None:
+			torch.save(self.q_function.state_dict(), self.outdir + '/advesaral_q_{:07d}.ckpt'.format(self.index))
+			torch.save(self.q_target.state_dict(), self.outdir + '/advesaral_q_target_{:07d}.ckpt'.format(self.index))
+		else:
+			torch.save(self.q_function.state_dict(),'./saved_models/advesaral_q_{:07d}.ckpt'.format(self.index))
+			torch.save(self.q_target.state_dict(),'./saved_models/advesaral_q_target_{:07d}.ckpt'.format(self.index))
 		print("finish saving the advesarial model")
 	def restore_model(self, index):
 		self.index = index

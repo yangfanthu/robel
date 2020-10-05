@@ -8,6 +8,7 @@ import os
 import sys
 import datetime
 import argparse
+import random
 
 
 from modules import *
@@ -32,22 +33,38 @@ if __name__ == "__main__":
 	max_action = max_action,
 	device = device,
 	hidden_size=512)
-	ddpg.restore_model(2980000)
+	ddpg.restore_model(475000)
+	adversary = AdversarialDQN(state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
+	adversary.restore_model(470000)
 	current_state = env.reset()
 	env.render()
 	sum_reward = 0
-	while True:
-		action = ddpg.select_action(current_state, 'test')
-		# action[0] = -0.2
-		# action[1] = -0.2
-		# action[2] = -0.2
-		next_state, reward, done, info = env.step(action)
-		sum_reward += reward 
-		# print(sum_reward)
-		suc = info['score/success']
-		
-		current_state = next_state
-		if done:
-			current_state = env.reset()
-			print(sum_reward)
-			sum_reward = 0
+	index = 0
+	episode = 0
+	with torch.no_grad():
+		while True:
+			action = ddpg.select_action(current_state, 'test')
+			adversary_action = adversary.select_action(current_state,'test')
+			index += 1
+			# action = np.ones(9) * -0.6
+			# action[4] = -0.6  # this case doesn't work, also 6,7
+			# action[1] = -0.6
+
+			# action[random.randint(0,8)] = 0
+			# print(adversary_action)
+			# action[adversary_action[0]] = -0.6
+			# action[random.randint(0,8)] = 0
+			next_state, reward, done, info = env.step(action)
+			sum_reward += reward 
+			# print(sum_reward)
+			suc = info['score/success']
+			
+			current_state = next_state
+			if done:
+				episode += 1
+				current_state = env.reset()
+				print(sum_reward)
+				# random_list.append(sum_reward)
+				# print("episode: {}, avg: {}".format(episode, np.array(random_list).mean()))
+				sum_reward = 0
+			
