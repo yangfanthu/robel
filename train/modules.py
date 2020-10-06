@@ -321,14 +321,6 @@ class AdversarialDQN(object):
 		
 		with torch.no_grad():
 			target = reward + self.gamma * not_done * self.q_target(next_state, self.select_action_target(next_state))
-			# try:
-			# 	target = reward + self.gamma * not_done * self.q_target(next_state, self.select_action_target(next_state))
-			# except:
-			# 	print(self.select_action_target(next_state))
-			# 	print(next_state.shape)
-			# 	print(reward.shape)
-			# 	print(not_done.shape)
-			# 	pdb.set_trace()
 		current_q = self.q_function(current_state, action)
 		loss = self.criterion(current_q, target)
 

@@ -33,14 +33,15 @@ if __name__ == "__main__":
 	max_action = max_action,
 	device = device,
 	hidden_size=512)
-	ddpg.restore_model(475000)
+	ddpg.restore_model(1505000)
 	adversary = AdversarialDQN(state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
-	adversary.restore_model(470000)
+	adversary.restore_model(1505000)
 	current_state = env.reset()
 	env.render()
 	sum_reward = 0
 	index = 0
 	episode = 0
+	# env._max_episode_steps = 60
 	with torch.no_grad():
 		while True:
 			action = ddpg.select_action(current_state, 'test')
@@ -48,7 +49,7 @@ if __name__ == "__main__":
 			index += 1
 			# action = np.ones(9) * -0.6
 			# action[4] = -0.6  # this case doesn't work, also 6,7
-			# action[1] = -0.6
+			action[8] = -0.6
 
 			# action[random.randint(0,8)] = 0
 			# print(adversary_action)
