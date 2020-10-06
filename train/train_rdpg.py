@@ -185,7 +185,6 @@ if __name__ == "__main__":
         "the adversary q training loop"
         performance_list = []
         for i in range(action_dim):
-            reward_list = []
             sum_reward = 0
             current_state = env.reset()
             episode_t = 0
@@ -201,8 +200,8 @@ if __name__ == "__main__":
                 action = copy.deepcopy(original_action)
                 action[i] = -0.6
                 next_state, reward, done, info = env.step(action)
-                reward_list.append(reward)
-                # sum_reward += reward
+                # reward_list.append(reward)
+                sum_reward += reward
                 current_state = next_state
                 # current_state_buffer[episode_t] = current_state
                 if episode_t < max_episode_steps:
@@ -214,8 +213,9 @@ if __name__ == "__main__":
                         current_state_buffer[episode_t + 1] = next_state
                 if done:
                     current_state = env.reset()
-                    avg_reward = np.array(reward_list).mean()
-                    performance_list.append(avg_reward)
+                    # avg_reward = np.array(reward_list).mean()
+                    performance_list.append(sum_reward)
+                    sum_reward = 0
                     current_state_buffer = np.zeros((max_episode_steps, state_dim))
                     action_buffer = np.zeros((max_episode_steps, action_dim))
                     next_state_buffer = np.zeros((max_episode_steps, state_dim))
