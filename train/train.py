@@ -144,7 +144,7 @@ if __name__ == "__main__":
 	os.system('mkdir ' + outdir)
 	with open(outdir+'/setting.txt','w') as f:
 		for each_arg, value in args.__dict__.items():
-			f.writelines("purely ddpg, without any adversary")
+			# f.writelines("purely ddpg, without any adversary")
 			f.writelines(each_arg + " : " + str(value)+"\n")
 	writer = SummaryWriter(logdir=('logs/{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
@@ -219,7 +219,6 @@ if __name__ == "__main__":
 				broken_joints.append(adversary_action[0])
 			for broken_one in broken_joints:
 				action[broken_one] = -0.6
-			action[adversary_action[0]] = 0
 			next_state, reward, done, info = adversarial_env.base_env.step(action)
 			suc = info['score/success']
 			adversarial_env.ddpg.add_buffer(current_state, original_action, next_state,reward,done)
