@@ -183,8 +183,8 @@ class DDPG(object):
 		print('finish saving')
 	def restore_model(self, index):
 		self.index = index
-		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index)))
-		self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index)))
+		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index), map_location = self.device))
+		self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index), map_location = self.device))
 		print('finish restoring model')
 
 	def train(self):
@@ -310,8 +310,8 @@ class AdversarialDQN(object):
 		print("finish saving the advesarial model")
 	def restore_model(self, index):
 		self.index = index
-		self.q_function.load_state_dict(torch.load('./saved_models/advesaral_q_{:07d}.ckpt'.format(self.index)))
-		self.q_target.load_state_dict(torch.load('./saved_models/advesaral_q_target_{:07d}.ckpt'.format(self.index)))
+		self.q_function.load_state_dict(torch.load('./saved_models/advesaral_q_{:07d}.ckpt'.format(self.index), map_location = self.device))
+		self.q_target.load_state_dict(torch.load('./saved_models/advesaral_q_target_{:07d}.ckpt'.format(self.index), map_location = self.device))
 		print("finish restoring the advesarial model")
 	def train(self):
 		self.index += 1
@@ -418,8 +418,8 @@ class RDPG(object):
 		print('finish saving')
 	def restore_model(self, index):
 		self.index = index
-		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index)))
-		self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index)))
+		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index), map_location = self.device))
+		self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index), map_location = self.device))
 		print('finish restoring model')
 
 	def train(self):
