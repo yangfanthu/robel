@@ -26,23 +26,33 @@ class Critic(torch.nn.Module):
 		return q_value
 
 class Actor(torch.nn.Module):
-	def __init__(self, state_dim: int, action_dim:int, max_action:float = 1.,hidden_size: int = 256):
+	def __init__(self, state_dim: int, action_dim:int, max_action:float = 1.,hidden_size: int = 256, broken_info_recap = False):
 		super(Actor, self).__init__()
 		self.max_action = max_action
 		self.state_dim = state_dim
 		self.action_dim	= action_dim
 		self.hidden_size = hidden_size
+		self.broken_info_recap = broken_info_recap
 
 		self.fc_1 = nn.Linear(state_dim, hidden_size)
 		self.fc_2 = nn.Linear(hidden_size, hidden_size)
 		self.fc_3 = nn.Linear(hidden_size, hidden_size)
 		self.fc_4 = nn.Linear(hidden_size, action_dim)
 	def forward(self, state):
+		if self.broken_info_recap:
+			if len(state.shape) == 1:
+				joint_info = state[-9:]
+			elif len(state.shape) == 2:
+				joint_info = state[:, -9:]
+			else:
+				raise ValueError("input the wrong state for the actor")
 		hidden = F.relu(self.fc_1(state))
 		hidden = F.relu(self.fc_2(hidden))
 		hidden = F.relu(self.fc_3(hidden))
 		hidden = self.fc_4(hidden)
 		action = torch.tanh(hidden) * self.max_action
+		if self.broken_info_recap:
+			action = action * joint_info
 		return action
 
 class RecurrentCritic(torch.nn.Module):
@@ -125,7 +135,8 @@ class DDPG(object):
 		variance:float = 0.1,
 		save_freq:int = 8000,
 		record_freq:int=100,
-		outdir = None):
+		outdir = None,
+		broken_info_recap = False):
 
 		self.batch_size = batch_size
 		self.gamma = gamma
@@ -139,10 +150,11 @@ class DDPG(object):
 		self.state_dim	= state_dim
 		self.save_freq = save_freq
 		self.record_freq = record_freq
+		self.broken_info_recap = broken_info_recap
 		self.critic = Critic(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size).to(device)
 		self.critic_target = copy.deepcopy(self.critic).to(device)
 		self.critic_target.eval()
-		self.actor = Actor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, max_action = max_action).to(device)
+		self.actor = Actor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, max_action = max_action, broken_info_recap=broken_info_recap).to(device)
 		self.actor_target = copy.deepcopy(self.actor).to(device)
 		self.actor_target.eval()
 

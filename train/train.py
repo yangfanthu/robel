@@ -70,7 +70,8 @@ class AdversarialEnv(object):
 		broken_info=False,
 		env_name='DClawTurnFixed-v0',
 		real_robot=False,
-		outdir = None):
+		outdir = None,
+		broken_info_recap = False):
 		self.ddpg_action_dim = ddpg_action_dim
 		self.ddpg_state_dim = ddpg_state_dim
 		self.ddpg_buffer_max_size = ddpg_buffer_max_size
@@ -90,7 +91,8 @@ class AdversarialEnv(object):
 						save_freq=ddpg_save_freq,
 						record_freq=ddpg_record_freq,
 						outdir = outdir,
-						hidden_size=ddpg_hidden_size)
+						hidden_size=ddpg_hidden_size,
+						broken_info_recap=broken_info_recap)
 		self.broken_timesteps = broken_timesteps
 		if real_robot:
 			self.base_env = gym.make(env_name, device_path='/dev/tty.usbserial-FT3WI485')
@@ -159,8 +161,12 @@ if __name__ == "__main__":
 	parser.add_argument("--ddpg-hidden-size", type=int, default=512)
 	parser.add_argument("--broken-info", action='store_true', default=True,
 	                    help="whether use broken joints indice as a part of state")
+	parser.add_argument("--broken-info-recap", action='store_true', default=True,
+						help='whether to use broken info again in actor module to reinforce the learning')
 	parser.add_argument("--broken-angle", type=float, default=-0.6)
 	args = parser.parse_args()
+	if args.broken_info_recap:
+		assert args.broken_info
 	base_env.seed(args.seed)
 	if not os.path.exists('./logs'):
 		os.system('mkdir logs')
@@ -210,7 +216,8 @@ if __name__ == "__main__":
 									broken_info=args.broken_info,
 									broken_timesteps=args.broken_timesteps,
 									outdir = outdir,
-									broken_angle = args.broken_angle)
+									broken_angle = args.broken_angle,
+									broken_info_recap=args.broken_info_recap)
 	if args.restore_step:
 		print("restoring the model {}".format(args.restore_step))
 		adversarial_env.ddpg.restore_model(args.restore_step)
