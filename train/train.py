@@ -71,7 +71,8 @@ class AdversarialEnv(object):
 		env_name='DClawTurnFixed-v0',
 		real_robot=False,
 		outdir = None,
-		broken_info_recap = False):
+		broken_info_recap = False,
+		divergence_reward = False):
 		self.ddpg_action_dim = ddpg_action_dim
 		self.ddpg_state_dim = ddpg_state_dim
 		self.ddpg_buffer_max_size = ddpg_buffer_max_size
@@ -91,8 +92,10 @@ class AdversarialEnv(object):
 						save_freq=ddpg_save_freq,
 						record_freq=ddpg_record_freq,
 						outdir = outdir,
+						variance=ddpg_variance,
 						hidden_size=ddpg_hidden_size,
-						broken_info_recap=broken_info_recap)
+						broken_info_recap=broken_info_recap,
+						divergence_reward=divergence_reward)
 		self.broken_timesteps = broken_timesteps
 		if real_robot:
 			self.base_env = gym.make(env_name, device_path='/dev/tty.usbserial-FT3WI485')
@@ -142,8 +145,8 @@ if __name__ == "__main__":
 	parser.add_argument("--start-timesteps", type=int, default=int(1e4))
 	parser.add_argument("--adversary-start-timesteps", type=int, default=int(1e4))
 	# parser.add_argument("--start-timesteps", type=int, default=int(4))
-	# parser.add_argument("--adversary-start-timesteps", type=int, default=int(11))
-	parser.add_argument("--max-timesteps", type=int, default=int(5e6))
+	# parser.add_argument("--adversary-start-timesteps", type=int, default=int(4))
+	parser.add_argument("--max-timesteps", type=int, default=int(1e7))
 	parser.add_argument("--eval-freq", type=int, default=5000)
 	parser.add_argument("--save-freq", type=int, default=5000)
 	parser.add_argument("--record-freq", type=int, default=5000)
@@ -153,7 +156,7 @@ if __name__ == "__main__":
 	parser.add_argument("--seed", type=int, default=0)
 	parser.add_argument("--buffer-max-size", type=int, default=int(1e6))
 	parser.add_argument("--ddpg-training-steps", type=int, default=int(5000))
-	parser.add_argument("--adversary-training-steps", type=int,default=int(5000))
+	parser.add_argument("--adversary-training-steps", type=int,default=int(1000))
 	# parser.add_argument("--ddpg-training-steps", type=int, default=int(2))
 	# parser.add_argument("--adversary-training-steps", type=int,default=int(2))
 	parser.add_argument("--restore-step", type=int, default=0)
@@ -161,9 +164,11 @@ if __name__ == "__main__":
 	parser.add_argument("--ddpg-hidden-size", type=int, default=512)
 	parser.add_argument("--broken-info", action='store_true', default=True,
 	                    help="whether use broken joints indice as a part of state")
-	parser.add_argument("--broken-info-recap", action='store_true', default=True,
+	parser.add_argument("--broken-info-recap", action='store_true', default=False,
 						help='whether to use broken info again in actor module to reinforce the learning')
 	parser.add_argument("--broken-angle", type=float, default=-0.6)
+	parser.add_argument("--std", type=float, default=0.1)
+	parser.add_argument("--divergence-reward", action="store_true", default=False)
 	args = parser.parse_args()
 	if args.broken_info_recap:
 		assert args.broken_info
@@ -176,7 +181,7 @@ if __name__ == "__main__":
 	outdir = os.path.join('./saved_models', outdir)
 	os.system('mkdir ' + outdir)
 	with open(outdir+'/setting.txt','w') as f:
-		# f.writelines("purely ddpg, without any adversary")
+		f.writelines("fix the broken info bug, make current state and next state consistent")
 		for each_arg, value in args.__dict__.items():
 			f.writelines(each_arg + " : " + str(value)+"\n")
 	writer = SummaryWriter(logdir=('logs/{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
@@ -212,15 +217,17 @@ if __name__ == "__main__":
 									ddpg_batch_size=64,
 									ddpg_max_action=max_action,
 									ddpg_tau=5e-3,
-									ddpg_variance=0.1,
+									ddpg_variance=args.std,
 									broken_info=args.broken_info,
 									broken_timesteps=args.broken_timesteps,
 									outdir = outdir,
 									broken_angle = args.broken_angle,
-									broken_info_recap=args.broken_info_recap)
+									broken_info_recap=args.broken_info_recap,
+									divergence_reward=args.divergence_reward)
 	if args.restore_step:
 		print("restoring the model {}".format(args.restore_step))
-		adversarial_env.ddpg.restore_model(args.restore_step)
+		adversarial_env.ddpg.restore_model_for_train(args.restore_step)
+		adversarial_env.ddpg.index = 0
 		adversary.restore_model(args.restore_step)
 	current_state = adversarial_env.reset()
 	if args.broken_info:
@@ -281,6 +288,8 @@ if __name__ == "__main__":
 			if ddpg_t > args.start_timesteps:
 				adversarial_env.ddpg.train()
 			current_state = next_state
+			"fix the bug"
+			current_state[original_state_dim:] = 1
 			if done:
 				broken_joints = collections.deque(maxlen=1)
 				current_state = adversarial_env.reset()
@@ -314,7 +323,6 @@ if __name__ == "__main__":
 			if done:
 				current_state = adversarial_env.reset()
 				episode += 1
-
 
 
 			

@@ -2,7 +2,7 @@ import torch
 import numpy as np
 
 class ReplayBuffer(object):
-	def __init__(self, state_dim, action_dim, max_size=int(1e6), device=torch.device('cuda')):
+	def __init__(self, state_dim, action_dim, outdir, max_size=int(1e6), device=torch.device('cuda')):
 		self.max_size = max_size
 		self.ptr = 0
 		self.size = 0
@@ -14,8 +14,7 @@ class ReplayBuffer(object):
 		self.not_done = torch.zeros((max_size, 1), device=device)
 
 		self.device = device
-
-
+		self.outdir = outdir
 	def add(self, state, action, next_state, reward, done):
 		self.state[self.ptr] = torch.tensor(state, device=self.device)
 		self.action[self.ptr] = torch.tensor(action, device=self.device)
@@ -36,6 +35,28 @@ class ReplayBuffer(object):
 			self.reward[ind],
 			self.not_done[ind]
 		)
+	def save(self, suffix=''):
+		if self.size >= self.max_size:
+			item = [self.state, self.action, self.next_state, self.reward, self.not_done, torch.tensor(self.ptr)]
+			if self.outdir:
+				torch.save(item, self.outdir + '/replay_buffer' + suffix)
+			else:
+				torch.save(item, './saved_models/replay_buffer' + suffix)
+			print("finish saving the replay buffer")
+		else:
+			print("only save max buffer, the current size is {}/{}".format(self.size, self.max_size))
+	def restore(self, suffix=''):
+		if self.outdir:
+			item = torch.load(self.outdir + '/replay_buffer' + suffix)
+		else:
+			item = torch.load('./saved_models/replay_buffer' + suffix)
+		self.state = item[0]
+		self.action = item[1]
+		self.next_state = item[2]
+		self.reward = item[3]
+		self.not_done = item[4] 
+		self.ptr = item[5]
+		self.size = self.max_size
 
 
 class RDPGReplayBuffer(object):

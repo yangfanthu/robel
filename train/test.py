@@ -21,8 +21,12 @@ if __name__ == "__main__":
 	parser.add_argument("--max-timesteps", type=int, default=3e6)
 	parser.add_argument("--eval-freq", type = int, default = 2000)
 	parser.add_argument("--broken-info", action='store_true', default=True,
-	                    help="whether use broken joints indice as a part of state")
+						help="whether use broken joints indice as a part of state")
+	parser.add_argument("--broken-info-recap", action='store_true', default=True,
+						help='whether to use broken info again in actor module to reinforce the learning')
 	args = parser.parse_args()
+	if args.broken_info_recap:
+		assert args.broken_info
 	# device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 	device = torch.device('cpu')
 	state_dim = env.reset().shape[0]
@@ -38,13 +42,14 @@ if __name__ == "__main__":
 	writer = None,
 	max_action = max_action,
 	device = device,
-	hidden_size=512)
-	ddpg.restore_model(1160000)
+	hidden_size=512,
+	broken_info_recap=args.broken_info_recap)
+	ddpg.restore_model_for_test(7670000)
 	adversary = AdversarialDQN(original_state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
-	# adversary.restore_model(2485000)
+	# adversary.restore_model(2495000)
 	current_state = env.reset()
 
-	broken_joints = []
+	broken_joints = [8] # 5 doesn't work
 
 	if args.broken_info:
 		current_state = np.concatenate((current_state, np.ones(9)))
@@ -54,10 +59,15 @@ if __name__ == "__main__":
 	sum_reward = 0
 	index = 0
 	episode = 0
-	env._max_episode_steps = 80
+	env._max_episode_steps = 200
 	with torch.no_grad():
 		while True:
-			# adversary_action = adversary.select_action(current_state, 'test')
+			if args.broken_info:
+				adversary_action = adversary.select_action(current_state[:original_state_dim], 'test')
+			else:
+				adversary_action = adversary.select_action(current_state, 'test')
+			# print(adversary_action)
+			# pdb.set_trace()
 			action = ddpg.select_action(current_state, 'test')
 			index += 1
 			for broken_one in broken_joints:
@@ -74,6 +84,7 @@ if __name__ == "__main__":
 			if args.broken_info:
 				next_state = np.concatenate((next_state, np.ones(9)))
 				for broken_one in broken_joints:
+					current_state[original_state_dim + broken_one] = 0
 					next_state[original_state_dim + broken_one] = 0
 			sum_reward += reward 
 			# print(sum_reward)

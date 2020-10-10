@@ -51,6 +51,8 @@ class Actor(torch.nn.Module):
 		hidden = F.relu(self.fc_3(hidden))
 		hidden = self.fc_4(hidden)
 		action = torch.tanh(hidden) * self.max_action
+		if True in torch.isnan(action):
+			pdb.set_trace()
 		if self.broken_info_recap:
 			action = action * joint_info
 		return action
@@ -136,13 +138,14 @@ class DDPG(object):
 		save_freq:int = 8000,
 		record_freq:int=100,
 		outdir = None,
-		broken_info_recap = False):
+		broken_info_recap = False,
+		divergence_reward = True):
 
 		self.batch_size = batch_size
 		self.gamma = gamma
 		self.max_action = max_action
 		self.hidden_size = hidden_size
-		self.replay_buffer = utils.ReplayBuffer(state_dim = state_dim, action_dim = action_dim, max_size=buffer_max_size, device=device)
+		self.replay_buffer = utils.ReplayBuffer(state_dim = state_dim, action_dim = action_dim, max_size=buffer_max_size, device=device, outdir=outdir)
 		self.tau = tau
 		self.device = device
 		self.variance = variance
@@ -165,6 +168,7 @@ class DDPG(object):
 		self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr = 1e-3)
 		self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr = 1e-3)
 		self.outdir = outdir
+		self.divergence_reward = divergence_reward
 
 	def add_buffer(self,current_state,action,next_state,reward,done):
 		self.replay_buffer.add(current_state,action,next_state,reward,done)
@@ -192,11 +196,18 @@ class DDPG(object):
 			torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
 			torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
 			torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
+		self.replay_buffer.save()
 		print('finish saving')
-	def restore_model(self, index):
-		self.index = index
+	def restore_model_for_test(self, index):
 		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index), map_location = self.device))
 		self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index), map_location = self.device))
+		print('finish restoring model')
+	def restore_model_for_train(self, index):
+		self.index = index
+		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index), map_location = self.device))
+		self.actor_target.load_state_dict(torch.load('./saved_models/actor_target_{:07d}.ckpt'.format(index), map_location = self.device))
+		self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index), map_location = self.device))
+		self.critic_target.load_state_dict(torch.load('./saved_models/critic_target_{:07d}.ckpt'.format(index), map_location = self.device))		
 		print('finish restoring model')
 
 	def train(self):
@@ -215,6 +226,24 @@ class DDPG(object):
 
 		self.actor_optimizer.zero_grad()
 		actor_loss = - self.critic(current_state, self.actor(current_state)).mean()
+		if self.divergence_reward:
+			action_buffer = []
+			temp_state = copy.deepcopy(current_state)
+			temp_joint_info = torch.ones((current_state.shape[0],9))
+			temp_state[:,(self.state_dim - 9):] = temp_joint_info
+			original_action = self.actor(temp_state)
+			for i in range(9):
+				temp_state = copy.deepcopy(current_state)
+				temp_joint_info = torch.ones((current_state.shape[0],9))
+				temp_joint_info[:,i] = 0
+				temp_state[:,(self.state_dim - 9):] = temp_joint_info
+				temp_state = temp_state.to(self.device)
+				this_action = self.actor(temp_state)
+				l2_distance = (this_action - original_action).norm(dim=-1)
+				action_buffer.append(l2_distance)
+			action_buffer = torch.stack(action_buffer, dim = -1)
+			action_range = action_buffer.mean()
+			actor_loss = actor_loss + max(20 - self.index * 3e-6, 0) * action_range
 		actor_loss.backward()
 		self.actor_optimizer.step()
 
@@ -261,7 +290,7 @@ class AdversarialDQN(object):
 		self.epsilon = epsilon
 		self.device = device
 		self.writer = writer
-		self.replay_buffer = utils.ReplayBuffer(state_dim = state_dim, action_dim = 1, max_size=buffer_max_size, device=device)
+		self.replay_buffer = utils.ReplayBuffer(state_dim = state_dim, action_dim = 1, max_size=buffer_max_size, device=device, outdir=outdir)
 		self.index = 0
 		self.batch_size = batch_size
 		self.learning_rate = learning_rate
@@ -319,6 +348,7 @@ class AdversarialDQN(object):
 		else:
 			torch.save(self.q_function.state_dict(),'./saved_models/advesaral_q_{:07d}.ckpt'.format(self.index))
 			torch.save(self.q_target.state_dict(),'./saved_models/advesaral_q_target_{:07d}.ckpt'.format(self.index))
+		self.replay_buffer.save('adversary')
 		print("finish saving the advesarial model")
 	def restore_model(self, index):
 		self.index = index
@@ -427,6 +457,7 @@ class RDPG(object):
 			torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
 			torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
 			torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
+		# self.replay_buffer.save()
 		print('finish saving')
 	def restore_model(self, index):
 		self.index = index

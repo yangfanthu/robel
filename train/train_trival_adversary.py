@@ -138,7 +138,7 @@ class AdversarialEnv(object):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-timesteps", type=int, default=int(1e4))
-    parser.add_argument("--max-timesteps", type=int, default=int(5e6))
+    parser.add_argument("--max-timesteps", type=int, default=int(1e7))
     parser.add_argument("--eval-freq", type=int, default=5000)
     parser.add_argument("--save-freq", type=int, default=5000)
     parser.add_argument("--record-freq", type=int, default=5000)
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     parser.add_argument("--ddpg-hidden-size", type=int, default=512)
     parser.add_argument("--broken-info", action='store_true', default=True,
 	                help="whether use broken joints indice as a part of state")
-    parser.add_argument("--broken-info-recap", action='store_true', default=True,
+    parser.add_argument("--broken-info-recap", action='store_true', default=False,
 						help='whether to use broken info again in actor module to reinforce the learning')
     args = parser.parse_args()
     if args.broken_info_recap:
@@ -197,7 +197,7 @@ if __name__ == "__main__":
                                      broken_info_recap=args.broken_info_recap)
     if args.restore_step:
         print("restoring the model {}".format(args.restore_step))
-        adversarial_env.ddpg.restore_model(args.restore_step)
+        adversarial_env.ddpg.restore_model_for_train(args.restore_step)
         # adversarial_env.ddpg.index = 0
     current_state = adversarial_env.reset()
     if args.broken_info:
