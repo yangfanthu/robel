@@ -156,7 +156,7 @@ if __name__ == "__main__":
 	parser.add_argument("--seed", type=int, default=0)
 	parser.add_argument("--buffer-max-size", type=int, default=int(1e6))
 	parser.add_argument("--ddpg-training-steps", type=int, default=int(5000))
-	parser.add_argument("--adversary-training-steps", type=int,default=int(3000))
+	parser.add_argument("--adversary-training-steps", type=int,default=int(5000))
 	# parser.add_argument("--ddpg-training-steps", type=int, default=int(2))
 	# parser.add_argument("--adversary-training-steps", type=int,default=int(2))
 	parser.add_argument("--restore-step", type=int, default=0)
@@ -181,7 +181,7 @@ if __name__ == "__main__":
 	outdir = os.path.join('./saved_models', outdir)
 	os.system('mkdir ' + outdir)
 	with open(outdir+'/setting.txt','w') as f:
-		# f.writelines("fix the broken info bug, make current state and next state consistent")
+		# f.writelines("don't fix the broken info bug")
 		for each_arg, value in args.__dict__.items():
 			f.writelines(each_arg + " : " + str(value)+"\n")
 	writer = SummaryWriter(logdir=('logs/{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))

@@ -74,6 +74,7 @@ class RobotComponent(BaseComponent):
             denormalize: If True, denormalizes the action from normalized action
                 space [-1, 1] to the robot's control space.
         """
+        "the denormalize varialbel determinates whether your input control command is the actual control command"
         group_controls = []
         for group_name, control_values in control_groups.items():
             config = self.get_config(group_name)
