@@ -71,8 +71,7 @@ class AdversarialEnv(object):
 		env_name='DClawTurnFixed-v0',
 		real_robot=False,
 		outdir = None,
-		broken_info_recap = False,
-		divergence_reward = False):
+		broken_info_recap = False):
 		self.ddpg_action_dim = ddpg_action_dim
 		self.ddpg_state_dim = ddpg_state_dim
 		self.ddpg_buffer_max_size = ddpg_buffer_max_size
@@ -94,8 +93,7 @@ class AdversarialEnv(object):
 						outdir = outdir,
 						variance=ddpg_variance,
 						hidden_size=ddpg_hidden_size,
-						broken_info_recap=broken_info_recap,
-						divergence_reward=divergence_reward)
+						broken_info_recap=broken_info_recap)
 		self.broken_timesteps = broken_timesteps
 		if real_robot:
 			self.base_env = gym.make(env_name, device_path='/dev/tty.usbserial-FT3WI485')
@@ -168,7 +166,6 @@ if __name__ == "__main__":
 						help='whether to use broken info again in actor module to reinforce the learning')
 	parser.add_argument("--broken-angle", type=float, default=-0.6)
 	parser.add_argument("--std", type=float, default=0.1)
-	parser.add_argument("--divergence-reward", action="store_true", default=False)
 	args = parser.parse_args()
 	if args.broken_info_recap:
 		assert args.broken_info
@@ -222,8 +219,7 @@ if __name__ == "__main__":
 									broken_timesteps=args.broken_timesteps,
 									outdir = outdir,
 									broken_angle = args.broken_angle,
-									broken_info_recap=args.broken_info_recap,
-									divergence_reward=args.divergence_reward)
+									broken_info_recap=args.broken_info_recap)
 	if args.restore_step:
 		print("restoring the model {}".format(args.restore_step))
 		adversarial_env.ddpg.restore_model_for_train(args.restore_step)

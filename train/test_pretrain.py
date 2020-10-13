@@ -34,11 +34,6 @@ class Dataset(torch.utils.data.Dataset):
 
 
 if __name__ == "__main__":
-    outdir = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    outdir = 'pretrain' + outdir
-    outdir = os.path.join('./saved_models', outdir)
-    os.system('mkdir ' + outdir)
-    writer = SummaryWriter(logdir=('logs/pretrain{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
     input_state_dim = 12
     output_state_dim = 9
     action_dim = 9
@@ -46,7 +41,9 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model = DynamicModel(input_state_dim=input_state_dim, action_dim=action_dim, output_state_dim=output_state_dim, hidden_dim=hidden_dim)
     model = model.to(device)
+
     model.load_state_dict(torch.load('./saved_models/model_033.ckpt'))
+    
     buffer = ReplayBuffer(state_dim = input_state_dim, action_dim = action_dim)
     buffer.restore()
     val_set = Dataset(buffer, mode="validation")
@@ -59,16 +56,12 @@ if __name__ == "__main__":
     train_index = 0
     for epoch in range(max_epoch):
         with torch.no_grad():
-            loss_list = []
             for i, (current_state, action, next_state) in enumerate(val_loader):
                 current_state = current_state.float().to(device)
                 action = action.float().to(device)
                 next_state = next_state[:,:output_state_dim].float().to(device)
                 predict_state = model(current_state, action)
-                pdb.set_trace()
+                print(predict_state - next_state)
                 loss = criterion(predict_state, next_state)
-                loss_list.append(loss.item())
-            print("Epoch [{}/{}], Validation Loss: {:06f}"
-            .format(epoch, max_epoch, np.array(loss_list).mean()))
-            writer.add_scalar('val/loss', np.array(loss_list).mean(), epoch)
-            writer.close()
+                print(loss.item())
+                pdb.set_trace()

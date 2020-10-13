@@ -138,8 +138,7 @@ class DDPG(object):
 		save_freq:int = 8000,
 		record_freq:int=100,
 		outdir = None,
-		broken_info_recap = False,
-		divergence_reward = True):
+		broken_info_recap = False):
 
 		self.batch_size = batch_size
 		self.gamma = gamma
@@ -168,7 +167,6 @@ class DDPG(object):
 		self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr = 1e-3)
 		self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr = 1e-3)
 		self.outdir = outdir
-		self.divergence_reward = divergence_reward
 
 	def add_buffer(self,current_state,action,next_state,reward,done):
 		self.replay_buffer.add(current_state,action,next_state,reward,done)
@@ -226,24 +224,6 @@ class DDPG(object):
 
 		self.actor_optimizer.zero_grad()
 		actor_loss = - self.critic(current_state, self.actor(current_state)).mean()
-		if self.divergence_reward:
-			action_buffer = []
-			temp_state = copy.deepcopy(current_state)
-			temp_joint_info = torch.ones((current_state.shape[0],9))
-			temp_state[:,(self.state_dim - 9):] = temp_joint_info
-			original_action = self.actor(temp_state)
-			for i in range(9):
-				temp_state = copy.deepcopy(current_state)
-				temp_joint_info = torch.ones((current_state.shape[0],9))
-				temp_joint_info[:,i] = 0
-				temp_state[:,(self.state_dim - 9):] = temp_joint_info
-				temp_state = temp_state.to(self.device)
-				this_action = self.actor(temp_state)
-				l2_distance = (this_action - original_action).norm(dim=-1)
-				action_buffer.append(l2_distance)
-			action_buffer = torch.stack(action_buffer, dim = -1)
-			action_range = action_buffer.mean()
-			actor_loss = actor_loss + max(20 - self.index * 3e-6, 0) * action_range
 		actor_loss.backward()
 		self.actor_optimizer.step()
 
@@ -522,6 +502,172 @@ class DynamicModel(torch.nn.Module):
 		hidden = F.relu(self.fc_3(hidden))
 		output = self.fc_4(hidden)
 		return output
+class ModelWrapper(object):
+	def __init__(self, model, broken_angle = -0.6):
+		self.model = model
+		self.broken_angle = broken_angle
+	def forward(self, state, action):
+		if len(state.shape) == 1:
+			joint_info = state[-9:]
+			input_state = state[:-9]
+		elif len(state.shape) == 2:
+			joint_info = state[:, -9:]
+			input_state = state[:, :-9]
+		broken_angle = torch.where(joint_info == 0)
+		action[broken_angle] = self.broken_angle
+		output = self.model.forward(input_state, action)
+		return output
+
+class MBDDPG(object):
+	def __init__(self, 
+		state_dim:int,
+		action_dim:int, 
+		device, 
+		writer,
+		buffer_max_size=int(1e6), 
+		gamma:float = 0.99, 
+		batch_size:int = 64, 
+		max_action:float = 1., 
+		hidden_size: int = 256,
+		tau = 0.005,
+		variance:float = 0.1,
+		save_freq:int = 8000,
+		record_freq:int=100,
+		outdir = None,
+		broken_info_recap = False,
+		broken_angle = -0.6):
+
+		self.batch_size = batch_size
+		self.gamma = gamma
+		self.max_action = max_action
+		self.hidden_size = hidden_size
+		self.replay_buffer = utils.ReplayBuffer(state_dim=state_dim, action_dim=action_dim, max_size=buffer_max_size, device=device, outdir=outdir)
+		self.model_replay_buffer = utils.ReplayBuffer(state_dim=state_dim, action_dim=action_dim, max_size=int(buffer_max_size / 10), device=device, outdir=outdir)
+		self.tau = tau
+		self.device = device
+		self.variance = variance
+		self.action_dim = action_dim
+		self.state_dim	= state_dim
+		self.save_freq = save_freq
+		self.record_freq = record_freq
+		self.broken_info_recap = broken_info_recap
+		self.critic = Critic(state_dim = state_dim, action_dim = 9, hidden_size = hidden_size).to(device)
+		self.critic_target = copy.deepcopy(self.critic).to(device)
+		self.critic_target.eval()
+		self.actor = Actor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, max_action = max_action, broken_info_recap=broken_info_recap).to(device)
+		self.actor_target = copy.deepcopy(self.actor).to(device)
+		self.actor_target.eval()
+		self.broken_angle = broken_angle
+		output_state_dim = state_dim
+		model = DynamicModel(input_state_dim=12, # remove broken info
+								  action_dim=action_dim,
+								  output_state_dim=9)
+		model = model.to(device)
+		self.model_wrapper = ModelWrapper(model = model, broken_angle=self.broken_angle)
+		self.mse_loss = nn.MSELoss()
+		self.index = 0
+		self.writer = writer
+		learning_rate = 1e-3
+		self.actor_optimizer = torch.optim.Adam(self.actor.parameters(), lr = 1e-3)
+		self.critic_optimizer = torch.optim.Adam(self.critic.parameters(), lr = 1e-3)
+		self.model_optimizer = torch.optim.Adam(self.model_wrapper.model.parameters(), lr = 1e-3)
+		self.outdir = outdir
+	def load_pretrained_model(self):
+		self.model_wrapper.model.load_state_dict(torch.load('./saved_models/model_033.ckpt', map_location=self.device))
+		print("finish loading the model")
+
+	def add_buffer(self,current_state,action,next_state,reward,done):
+		self.replay_buffer.add(current_state,action,next_state,reward,done)
+	def add_model_buffer(self, current_state, action, next_state, reward, done):
+		self.model_replay_buffer.add(current_state,action,next_state,reward,done)
+	def select_action(self, state, mode = "train"):
+		temp_state = state
+		state = torch.tensor(state).float().to(self.device)
+		with torch.no_grad():
+			if mode == "train":
+				action = self.actor(state).cpu().detach().numpy()
+				noise = np.random.normal(0,self.variance,self.action_dim)
+				action = action + noise
+			elif mode == "test":
+				action = self.actor(state).cpu().detach().numpy()
+		action = np.clip(action, -self.max_action, self.max_action)
+		return action
+	def save_model(self):
+		print('saving...')
+		if self.outdir != None:
+			torch.save(self.actor.state_dict(),self.outdir + '/actor_{:07d}.ckpt'.format(self.index))
+			torch.save(self.critic.state_dict(),self.outdir + '/critic_{:07d}.ckpt'.format(self.index))
+			torch.save(self.actor_target.state_dict(),self.outdir + '/actor_target_{:07d}.ckpt'.format(self.index))
+			torch.save(self.critic_target.state_dict(),self.outdir + '/critic_target_{:07d}.ckpt'.format(self.index))
+		else:
+			torch.save(self.actor.state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
+			torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
+			torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
+			torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
+		self.replay_buffer.save()
+		print('finish saving')
+	def restore_model_for_test(self, index):
+		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index), map_location = self.device))
+		self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index), map_location = self.device))
+		print('finish restoring model')
+	def restore_model_for_train(self, index):
+		self.index = index
+		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index), map_location = self.device))
+		self.actor_target.load_state_dict(torch.load('./saved_models/actor_target_{:07d}.ckpt'.format(index), map_location = self.device))
+		self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index), map_location = self.device))
+		self.critic_target.load_state_dict(torch.load('./saved_models/critic_target_{:07d}.ckpt'.format(index), map_location = self.device))		
+		print('finish restoring model')
+
+	def train(self):
+		self.index += 1
+		current_state, action, next_state, reward, not_done = self.replay_buffer.sample(self.batch_size)
+		
+		self.critic_optimizer.zero_grad()
+		with torch.no_grad():
+			target = reward + self.gamma * not_done * self.critic_target(next_state, self.model_wrapper.forward(next_state, self.actor_target(next_state)))
+		current_q = self.critic(current_state, self.model_wrapper.forward(current_state, action))
+		critic_loss = self.mse_loss(target, current_q)
+		
+
+		critic_loss.backward()
+		self.critic_optimizer.step()
+
+		self.actor_optimizer.zero_grad()
+		actor_loss = -self.critic(current_state, self.model_wrapper.forward(current_state, self.actor(current_state))).mean()
+		actor_loss.backward()
+		self.actor_optimizer.step()
+		# TODO: whether we should loop over every broken case to train actor
+
+		current_state, action, next_state, reward, not_done = self.model_replay_buffer.sample(self.batch_size)
+		predict_next_state = self.model_wrapper.forward(current_state, action)
+		# pdb.set_trace()
+		# predict_next_state = predict_next_state[:,:-9]
+		next_state = next_state[:,:9]
+		model_loss = self.mse_loss(predict_next_state, next_state)
+		self.model_optimizer.zero_grad()
+		model_loss.backward()
+		self.model_optimizer.step()
+
+		if self.index % self.record_freq == 0 and self.writer != None:
+			self.writer.add_scalar('./train/critic_loss',critic_loss.item(), self.index)
+			self.writer.add_scalar('./train/actor_loss', actor_loss.item(), self.index)
+			self.writer.add_scalar('./train/current_q', current_q.mean().item(), self.index)
+			self.writer.add_scalar('./train/reward_max', reward.max().item(), self.index)
+			self.writer.add_scalar('./train/reward_mean', reward.mean().item(), self.index)
+			self.writer.add_scalar('./train/model_loss', model_loss.mean().item(), self.index)
+			# self.writer.add_scalar('./train/actor_q', -actor_loss.item(), self.index)
+
+
+		for param, target_param in zip(self.critic.parameters(), self.critic_target.parameters()):
+			target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+
+		for param, target_param in zip(self.actor.parameters(), self.actor_target.parameters()):
+			target_param.data.copy_(self.tau * param.data + (1 - self.tau) * target_param.data)
+
+		if self.index % self.save_freq == 0:
+			self.save_model()
+
+
 if __name__ == "__main__":
 	adversarial_dqn = AdversarialDQN(state_dim=3, n_actions=3,device='cpu',writer=None)
 	dumb_state = np.ones(3)
