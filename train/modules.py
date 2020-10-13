@@ -508,7 +508,20 @@ class RDPG(object):
 		if self.index % self.save_freq == 0:
 			self.save_model()
 
-
+class DynamicModel(torch.nn.Module):
+	def __init__(self, input_state_dim, action_dim, output_state_dim, hidden_dim=512):
+		super(DynamicModel, self).__init__()
+		self.fc_1 = nn.Linear(input_state_dim + action_dim, hidden_dim)
+		self.fc_2 = nn.Linear(hidden_dim, hidden_dim)
+		self.fc_3 = nn.Linear(hidden_dim, hidden_dim)
+		self.fc_4 = nn.Linear(hidden_dim, output_state_dim)
+	def forward(self, state, action):
+		x = torch.cat((state, action), dim=-1)
+		hidden = F.relu(self.fc_1(x))
+		hidden = F.relu(self.fc_2(hidden))
+		hidden = F.relu(self.fc_3(hidden))
+		output = self.fc_4(hidden)
+		return output
 if __name__ == "__main__":
 	adversarial_dqn = AdversarialDQN(state_dim=3, n_actions=3,device='cpu',writer=None)
 	dumb_state = np.ones(3)

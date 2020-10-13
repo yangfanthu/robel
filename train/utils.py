@@ -1,8 +1,16 @@
 import torch
 import numpy as np
 
+def trim_state(current_state):
+	joint = current_state[:9]
+	cossin = current_state[9:11]
+	# command = current_state[11:20]
+	other = current_state[20]
+	output_state = np.concatenate((joint, cossin, np.array([other])), axis=0)
+	return output_state
+
 class ReplayBuffer(object):
-	def __init__(self, state_dim, action_dim, outdir, max_size=int(1e6), device=torch.device('cuda')):
+	def __init__(self, state_dim, action_dim, outdir = None, max_size=int(1e6), device=torch.device('cuda')):
 		self.max_size = max_size
 		self.ptr = 0
 		self.size = 0

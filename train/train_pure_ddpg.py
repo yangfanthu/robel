@@ -58,9 +58,9 @@ def eval_policy(policy, env_name, eval_episodes=1, broken_info=False, real_robot
 def trim_state(current_state):
     joint = current_state[:9]
     cossin = current_state[9:11]
-    command = current_state[11:20]
+    # command = current_state[11:20]
     other = current_state[20]
-    output_state = np.concatenate((joint,cossin, np.array([other])), axis=0)
+    output_state = np.concatenate((joint, cossin, np.array([other])), axis=0)
     return output_state
 env = gym.make('DClawTurnFixed-v0')
 # env = gym.make('DClawTurnFixed-v0', device_path='/dev/tty.usbserial-FT3WI485')
