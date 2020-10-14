@@ -26,7 +26,7 @@ class Critic(torch.nn.Module):
 		return q_value
 class MBCritic(torch.nn.Module):
 	def __init__(self, state_dim_1:int, state_dim_2, action_dim:int, hidden_size: int = 256):
-		super(Critic, self).__init__()
+		super(MBCritic, self).__init__()
 		self.state_dim_1 = state_dim_1
 		self.state_dim_2 = state_dim_2
 		self.action_dim	= action_dim

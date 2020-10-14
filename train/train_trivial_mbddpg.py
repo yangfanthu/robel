@@ -52,93 +52,6 @@ def eval_policy(policy, env_name, eval_episodes=1, broken_info=False, real_robot
 env = gym.make('DClawTurnFixed-v0')
 # env = gym.make('DClawTurnFixed-v0', device_path='/dev/tty.usbserial-FT3WI485')
 
-class AdversarialEnv(object):
-    def __init__(self,
-                 ddpg_action_dim,
-                 ddpg_state_dim,
-                 ddpg_buffer_max_size,
-                 writer,
-                 ddpg_gamma,
-                 ddpg_hidden_size,
-                 ddpg_save_freq,
-                 ddpg_record_freq,
-                 ddpg_batch_size,
-                 ddpg_max_action,
-                 ddpg_tau,
-                 ddpg_variance,
-                 device,
-                 broken_timesteps,
-                 broken_info = False,
-                 env_name='DClawTurnFixed-v0',
-                 real_robot=False,
-                 outdir = None,
-                 broken_info_recap = False,
-                 broken_angle = -0.6):
-        self.ddpg_action_dim = ddpg_action_dim
-        self.ddpg_state_dim = ddpg_state_dim
-        self.ddpg_buffer_max_size = ddpg_buffer_max_size
-        self.writer = writer
-        self.ddpg_gamma = ddpg_gamma
-        self.ddpg_hidden_size = ddpg_hidden_size
-        self.ddpg_save_freq = ddpg_save_freq
-        self.device = device
-        self.env_name = env_name 
-        self.real_robot = real_robot
-        self.ddpg = MBDDPG(state_dim=ddpg_state_dim,
-                           action_dim=ddpg_action_dim,
-                           device=device,
-                           writer=writer,
-                           buffer_max_size=ddpg_buffer_max_size,
-                           gamma=ddpg_gamma,
-                           save_freq=ddpg_save_freq,
-                           record_freq=ddpg_record_freq,
-                           outdir = outdir,
-                           hidden_size=ddpg_hidden_size,
-                           broken_info_recap=broken_info_recap,
-                           broken_angle=broken_angle)
-        self.broken_timesteps = broken_timesteps
-        if real_robot:
-            self.base_env = gym.make(env_name, device_path='/dev/tty.usbserial-FT3WI485')
-        else:
-            self.base_env = gym.make(env_name)
-        self.action_space = self.base_env.action_space
-        self.outdir = outdir
-        self.broken_info = broken_info
-    def step(self, adversarial_action: int, ddpg_obs):
-        current_state = ddpg_obs
-        original_state_dim = current_state.shape[0]
-        if self.broken_info:
-            current_state = np.concatenate((current_state, np.ones(9)))
-            current_state[original_state_dim + adversarial_action] = 0
-        total_done = False
-        reward_list = []
-        for i in range(self.broken_timesteps):
-            ddpg_action = self.ddpg.select_action(current_state, 'test')
-            ddpg_action[adversarial_action] = -0.6
-            next_state, reward, done, info = self.base_env.step(ddpg_action)
-            original_next_state = next_state
-            if self.broken_info:
-                joint_info = np.ones(9)
-                joint_info[adversarial_action] = 0
-                next_state = np.concatenate((next_state, joint_info))
-            reward_list.append(reward)
-            if done:
-                total_done = done
-                break
-            current_state = next_state
-        avg_reward = np.array(reward_list).mean()
-        return original_next_state, avg_reward, total_done, info
-        # ddpg_action = self.ddpg.select_action(ddpg_obs, 'test')
-        # ddpg_action[advesarial_action] = 0.
-        # next_state, reward, done, info  = self.base_env.step(ddpg_action)
-        # return next_state, reward, done, info
-    def seed(self, input_seed):
-        self.base_env.seed(input_seed)
-    def reset(self):
-        return self.base_env.reset()
-
-
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-timesteps", type=int, default=int(1e4))
@@ -162,8 +75,6 @@ if __name__ == "__main__":
 						help='whether to use broken info again in actor module to reinforce the learning')
     parser.add_argument("--broken-angle", type=float, default=-0.6)
     args = parser.parse_args()
-    if args.broken_info_recap:
-        assert args.broken_info
     env.seed(args.seed)
     if not os.path.exists('./logs'):
         os.system('mkdir logs')
@@ -182,8 +93,7 @@ if __name__ == "__main__":
 
     state_dim = env.reset().shape[0] - 9
     original_state_dim = state_dim
-    if args.broken_info:
-        state_dim += 9
+    state_dim += 9 # add broken info
     action_dim = env.action_space.sample().shape[0]
     max_action = env.action_space.high[0]
 
@@ -213,13 +123,35 @@ if __name__ == "__main__":
         # ddpg.index = 0
     current_state = env.reset()
     current_state = utils.trim_state(current_state)
-    if args.broken_info:
-        current_state = np.concatenate((current_state, np.ones(9)))
+    current_state = np.concatenate((current_state, np.ones(9)))
     episode = 0
     t = 0
     ddpg_t = 0
     adversary_t = 0
     minimal_index = 0
+    def step(adversarial_action: int, ddpg_obs):
+        current_state = ddpg_obs
+        current_state[original_state_dim + adversarial_action] = 0
+        broken_timesteps = 1
+        
+        total_done = False
+        reward_list = []
+        for i in range(broken_timesteps):
+            ddpg_action = ddpg.select_action(current_state, 'test')
+            ddpg_action[adversarial_action] = -0.6
+            next_state, reward, done, info = env.step(ddpg_action)
+            original_next_state = next_state
+            next_state = utils.trim_state(next_state)
+            next_state = np.concatenate((next_state, np.ones(9)))
+            next_state[original_state_dim + adversarial_action] = 0
+            reward_list.append(reward)
+            if done:
+                total_done = done
+                break
+            current_state = next_state
+        avg_reward = np.array(reward_list).mean()
+        return original_next_state, avg_reward, total_done, info
+
     while True:
         if t > args.max_timesteps:
             break
@@ -270,15 +202,20 @@ if __name__ == "__main__":
         sum_reward = 0
         current_state = env.reset()
         current_state = utils.trim_state(current_state)
+        current_state = np.concatenate((current_state, np.ones(9)))
+        
         for i in range(action_dim):
             while True:
-                next_state, reward, done, info = adversarial_env.step(i, current_state)
+                next_state, reward, done, info = step(i, current_state)
                 next_state = utils.trim_state(next_state)
+                next_state = np.concatenate((next_state, np.ones(9)))
+                next_state[original_state_dim + i] = 0
                 sum_reward += reward
                 current_state = next_state
                 if done:
                     current_state = env.reset()
                     current_state = utils.trim_state(current_state)
+                    current_state = np.concatenate((current_state, np.ones(9)))
                     performance_list.append(sum_reward)
                     sum_reward = 0
                     break
@@ -287,7 +224,7 @@ if __name__ == "__main__":
         minimal_index = minimal_index[0][0]
         current_state = env.reset()
         current_state = utils.trim_state(current_state)
-        if args.broken_info:
-            current_state = np.concatenate((current_state, np.ones(9)))
+        current_state = np.concatenate((current_state, np.ones(9)))
+        
 
 
