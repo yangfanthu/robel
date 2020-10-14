@@ -24,6 +24,24 @@ class Critic(torch.nn.Module):
 		hidden = F.relu(self.fc_3(hidden))
 		q_value = self.fc_4(hidden)
 		return q_value
+class MBCritic(torch.nn.Module):
+	def __init__(self, state_dim_1:int, state_dim_2, action_dim:int, hidden_size: int = 256):
+		super(Critic, self).__init__()
+		self.state_dim_1 = state_dim_1
+		self.state_dim_2 = state_dim_2
+		self.action_dim	= action_dim
+		self.hidden_size = hidden_size
+		self.fc_1 = nn.Linear(state_dim_1 + state_dim_2 + action_dim, hidden_size)
+		self.fc_2 = nn.Linear(hidden_size, hidden_size)
+		self.fc_3 = nn.Linear(hidden_size, hidden_size)
+		self.fc_4 = nn.Linear(hidden_size, 1)
+	def forward(self, state, predict_state, action):
+		hidden = torch.cat((state, predict_state, action), dim=-1)
+		hidden = F.relu(self.fc_1(hidden))
+		hidden = F.relu(self.fc_2(hidden))
+		hidden = F.relu(self.fc_3(hidden))
+		q_value = self.fc_4(hidden)
+		return q_value
 
 class Actor(torch.nn.Module):
 	def __init__(self, state_dim: int, action_dim:int, max_action:float = 1.,hidden_size: int = 256, broken_info_recap = False):
@@ -521,6 +539,7 @@ class ModelWrapper(object):
 class MBDDPG(object):
 	def __init__(self, 
 		state_dim:int,
+		state_dim_2:int,
 		action_dim:int, 
 		device, 
 		writer,
@@ -551,7 +570,8 @@ class MBDDPG(object):
 		self.save_freq = save_freq
 		self.record_freq = record_freq
 		self.broken_info_recap = broken_info_recap
-		self.critic = Critic(state_dim = state_dim, action_dim = 9, hidden_size = hidden_size).to(device)
+		# self.critic = Critic(state_dim = state_dim, action_dim = 9, hidden_size = hidden_size).to(device)
+		self.critic = MBCritic(state_dim_1 = state_dim, state_dim_2=state_dim_2, action_dim = 9, hidden_size = hidden_size).to(device)
 		self.critic_target = copy.deepcopy(self.critic).to(device)
 		self.critic_target.eval()
 		self.actor = Actor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, max_action = max_action, broken_info_recap=broken_info_recap).to(device)
@@ -599,12 +619,15 @@ class MBDDPG(object):
 			torch.save(self.critic.state_dict(),self.outdir + '/critic_{:07d}.ckpt'.format(self.index))
 			torch.save(self.actor_target.state_dict(),self.outdir + '/actor_target_{:07d}.ckpt'.format(self.index))
 			torch.save(self.critic_target.state_dict(),self.outdir + '/critic_target_{:07d}.ckpt'.format(self.index))
+			torch.save(self.model_wrapper.model.state_dict(), self.outdir + '/model{:07d}.ckpt'.format(self.index))
 		else:
 			torch.save(self.actor.state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
 			torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
 			torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
 			torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
+			torch.save(self.model_wrapper.model.state_dict(), './saved_models/model_{:07d}.ckpt'.format(self.index))
 		self.replay_buffer.save()
+		self.model_replay_buffer.save('model')
 		print('finish saving')
 	def restore_model_for_test(self, index):
 		self.actor.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index), map_location = self.device))
@@ -624,8 +647,9 @@ class MBDDPG(object):
 		
 		self.critic_optimizer.zero_grad()
 		with torch.no_grad():
-			target = reward + self.gamma * not_done * self.critic_target(next_state, self.model_wrapper.forward(next_state, self.actor_target(next_state)))
-		current_q = self.critic(current_state, self.model_wrapper.forward(current_state, action))
+			target = reward + self.gamma * not_done * \
+				self.critic_target(next_state, self.model_wrapper.forward(next_state, self.actor_target(next_state)), self.actor_target(next_state))
+		current_q = self.critic(current_state, self.model_wrapper.forward(current_state, action), action)
 		critic_loss = self.mse_loss(target, current_q)
 		
 
@@ -633,7 +657,7 @@ class MBDDPG(object):
 		self.critic_optimizer.step()
 
 		self.actor_optimizer.zero_grad()
-		actor_loss = -self.critic(current_state, self.model_wrapper.forward(current_state, self.actor(current_state))).mean()
+		actor_loss = -self.critic(current_state, self.model_wrapper.forward(current_state, self.actor(current_state)), self.actor(current_state)).mean()
 		actor_loss.backward()
 		self.actor_optimizer.step()
 		# TODO: whether we should loop over every broken case to train actor
