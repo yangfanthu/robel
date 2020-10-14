@@ -208,6 +208,7 @@ if __name__ == "__main__":
                 next_state[broken_one + original_state_dim] = 0
             suc = info['score/success']
             ddpg.add_buffer(current_state, original_action, next_state, reward, done)
+            ddpg.add_model_buffer(current_state, original_action, next_state, reward, done)
             if ddpg_t > args.start_timesteps:
                 ddpg.train()
             current_state = next_state
