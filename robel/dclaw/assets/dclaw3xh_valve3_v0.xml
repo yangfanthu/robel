@@ -28,7 +28,7 @@
       <include file="../../robel-scenes/dclaw/assets/chain3xh.xml"/>
       <include file="../../robel-scenes/dclaw/assets/chain3xh_overlay.xml"/>
     </body>
-    <body name="object" pos="0 0 0.0001">
+    <body name="object" pos="0 0 0.0151">
       <include file="../../robel-scenes/dclaw_stations/assets/valve3.xml"/>
     </body>
     <body name="target" pos="0 0 0">
