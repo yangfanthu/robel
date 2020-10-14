@@ -178,6 +178,7 @@ if __name__ == "__main__":
 	outdir = os.path.join('./saved_models', outdir)
 	os.system('mkdir ' + outdir)
 	with open(outdir+'/setting.txt','w') as f:
+		# f.writelines("fix the broken info bug")
 		# f.writelines("don't fix the broken info bug")
 		for each_arg, value in args.__dict__.items():
 			f.writelines(each_arg + " : " + str(value)+"\n")

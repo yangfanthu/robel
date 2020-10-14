@@ -44,7 +44,7 @@ if __name__ == "__main__":
 	device = device,
 	hidden_size=512,
 	broken_info_recap=args.broken_info_recap)
-	ddpg.restore_model_for_test(4645000)
+	# ddpg.restore_model_for_test(4645000)
 	adversary = AdversarialDQN(original_state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
 	# adversary.restore_model(2495000)
 	current_state = env.reset()
@@ -84,7 +84,6 @@ if __name__ == "__main__":
 			command = current_state[11:20]
 			other = current_state[20]
 			print(joint)
-			print(vel)
 			print(other)
 			# pdb.set_trace()
 			next_state, reward, done, info = env.step(action)
