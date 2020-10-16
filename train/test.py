@@ -22,7 +22,7 @@ if __name__ == "__main__":
 	parser.add_argument("--eval-freq", type = int, default = 2000)
 	parser.add_argument("--broken-info", action='store_true', default=True,
 						help="whether use broken joints indice as a part of state")
-	parser.add_argument("--broken-info-recap", action='store_true', default=True,
+	parser.add_argument("--broken-info-recap", action='store_true', default=False,
 						help='whether to use broken info again in actor module to reinforce the learning')
 	args = parser.parse_args()
 	if args.broken_info_recap:
@@ -44,12 +44,12 @@ if __name__ == "__main__":
 	device = device,
 	hidden_size=512,
 	broken_info_recap=args.broken_info_recap)
-	# ddpg.restore_model_for_test(4645000)
+	ddpg.restore_model_for_test(2135000)
 	adversary = AdversarialDQN(original_state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
 	# adversary.restore_model(2495000)
 	current_state = env.reset()
 
-	broken_joints = [1] # 5 doesn't work
+	broken_joints = [0,1,2] # 5 doesn't work
 
 	if args.broken_info:
 		current_state = np.concatenate((current_state, np.ones(9)))
@@ -71,7 +71,7 @@ if __name__ == "__main__":
 			index += 1
 			for broken_one in broken_joints:
 				action[broken_one] = -0.6
-			action = np.ones(9) * -0.6
+			# action = np.ones(9) * -0.6
 			# action[4] = -0.6  # this case doesn't work, also 6,7
 			# action[1] = -0.6
 
@@ -79,13 +79,12 @@ if __name__ == "__main__":
 			# print(adversary_action)
 			# action[adversary_action[0]] = -0.6
 			# action[random.randint(0,8)] = 0
-			joint = current_state[:9]
-			cossin = current_state[9:11]
-			command = current_state[11:20]
-			other = current_state[20]
-			print(joint)
-			print(other)
-			# pdb.set_trace()
+			# joint = current_state[:9]
+			# cossin = current_state[9:11]
+			# command = current_state[11:20]
+			# other = current_state[20]
+			# print(joint)
+			# print(other)
 			next_state, reward, done, info = env.step(action)
 			if args.broken_info:
 				next_state = np.concatenate((next_state, np.ones(9)))

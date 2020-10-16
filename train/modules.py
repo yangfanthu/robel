@@ -531,8 +531,8 @@ class ModelWrapper(object):
 		elif len(state.shape) == 2:
 			joint_info = state[:, -9:]
 			input_state = state[:, :-9]
-		broken_angle = torch.where(joint_info == 0)
-		action[broken_angle] = self.broken_angle
+		broken_joints = torch.where(joint_info == 0)
+		action[broken_joints] = self.broken_angle
 		output = self.model.forward(input_state, action)
 		return output
 
@@ -571,7 +571,7 @@ class MBDDPG(object):
 		self.record_freq = record_freq
 		self.broken_info_recap = broken_info_recap
 		# self.critic = Critic(state_dim = state_dim, action_dim = 9, hidden_size = hidden_size).to(device)
-		self.critic = MBCritic(state_dim_1 = state_dim, state_dim_2=state_dim_2, action_dim = 9, hidden_size = hidden_size).to(device)
+		self.critic = MBCritic(state_dim_1 = state_dim, state_dim_2=state_dim_2, action_dim = action_dim, hidden_size = hidden_size).to(device)
 		self.critic_target = copy.deepcopy(self.critic).to(device)
 		self.critic_target.eval()
 		self.actor = Actor(state_dim = state_dim, action_dim = action_dim, hidden_size = hidden_size, max_action = max_action, broken_info_recap=broken_info_recap).to(device)
@@ -597,16 +597,16 @@ class MBDDPG(object):
 		print("finish loading the model")
 
 	def add_buffer(self,current_state,action,next_state,reward,done):
-		self.replay_buffer.add(current_state,action,next_state,reward,done)
+		self.replay_buffer.add(current_state, action, next_state, reward, done)
 	def add_model_buffer(self, current_state, action, next_state, reward, done):
-		self.model_replay_buffer.add(current_state,action,next_state,reward,done)
+		self.model_replay_buffer.add(current_state, action, next_state, reward, done)
 	def select_action(self, state, mode = "train"):
 		temp_state = state
 		state = torch.tensor(state).float().to(self.device)
 		with torch.no_grad():
 			if mode == "train":
 				action = self.actor(state).cpu().detach().numpy()
-				noise = np.random.normal(0,self.variance,self.action_dim)
+				noise = np.random.normal(0, self.variance, self.action_dim)
 				action = action + noise
 			elif mode == "test":
 				action = self.actor(state).cpu().detach().numpy()
@@ -656,10 +656,19 @@ class MBDDPG(object):
 		critic_loss.backward()
 		self.critic_optimizer.step()
 
-		self.actor_optimizer.zero_grad()
-		actor_loss = -self.critic(current_state, self.model_wrapper.forward(current_state, self.actor(current_state)), self.actor(current_state)).mean()
-		actor_loss.backward()
-		self.actor_optimizer.step()
+		# self.actor_optimizer.zero_grad()
+		# actor_loss = -self.critic(current_state, self.model_wrapper.forward(current_state, self.actor(current_state)), self.actor(current_state)).mean()
+		# actor_loss.backward()
+		# self.actor_optimizer.step()
+		current_state[(self.state_dim-9):] = 1
+		broken_index = [0,1,2,3,4,5,6,7,8]
+		random.shuffle(broken_index)
+		for i in broken_index:
+			current_state[self.state_dim - 9 + i] = 0
+			self.actor_optimizer.zero_grad()
+			actor_loss = -self.critic(current_state, self.model_wrapper.forward(current_state, self.actor(current_state)), self.actor(current_state)).mean()
+			actor_loss.backward()
+			self.actor_optimizer.step()
 		# TODO: whether we should loop over every broken case to train actor
 
 		current_state, action, next_state, reward, not_done = self.model_replay_buffer.sample(self.batch_size)

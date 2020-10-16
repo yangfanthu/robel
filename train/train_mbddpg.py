@@ -90,6 +90,7 @@ if __name__ == "__main__":
     os.system('mkdir ' + outdir)
     with open(outdir+'/setting.txt','w') as f:
         # f.writelines("fix the broken info bug")
+        f.writelines("new ways to compute actor loss, loop over each broken case\n ")
         f.writelines("don't fix the broken info bug\n")
         f.writelines("train model based ddpg \n")
         
@@ -144,6 +145,8 @@ if __name__ == "__main__":
     ddpg_t = 0
     adversary_t = 0
     def step(adversarial_action: int, ddpg_obs):
+        "input ddpg obs is processed and its broken info must be all 1s"
+        "return unprocessed next_state"
         current_state = ddpg_obs
         current_state[original_state_dim + adversarial_action] = 0
         # broken_timesteps = 1
@@ -229,8 +232,8 @@ if __name__ == "__main__":
         for i in range(args.adversary_training_steps):
             t += 1
             adversary_t += 1
-            action = adversary.select_action(current_state[:original_state_dim],'train')
-            next_state, reward, done, info = step(action[0],current_state)
+            action = adversary.select_action(current_state[:original_state_dim], 'train')
+            next_state, reward, done, info = step(action[0], current_state)
             next_state = utils.trim_state(next_state)
             next_state = np.concatenate((next_state, np.ones(9)))
             reward = -reward  # the adversary's target it to minimize the reward of the ddpg agent

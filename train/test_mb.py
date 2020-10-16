@@ -47,7 +47,7 @@ if __name__ == "__main__":
     device = device,
     hidden_size=512,
     broken_info_recap=args.broken_info_recap)
-    ddpg.restore_model_for_test(1290000)
+    ddpg.restore_model_for_test(4995000)
     adversary = AdversarialDQN(original_state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
     # adversary.restore_model(2495000)
     current_state = env.reset()
