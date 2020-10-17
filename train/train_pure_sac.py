@@ -175,8 +175,6 @@ if __name__ == "__main__":
             if agent_t > args.start_timesteps:
                 agent.update_parameters()
             current_state = next_state
-            "fix the bug"
-            current_state[original_state_dim:] = 1
             if done:
                 episode_steps = 0
                 current_state = env.reset()
