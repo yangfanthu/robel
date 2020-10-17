@@ -105,9 +105,9 @@ if __name__ == "__main__":
     state_dim += 9 # add broken info
     action_dim = env.action_space.sample().shape[0]
     max_action = env.action_space.high[0]
-    adversary = AdversarialDQN(original_state_dim, 
-                                action_dim, 
-                                device, 
+    adversary = AdversarialDQN(original_state_dim,
+                                action_dim,
+                                device,
                                 writer=writer,
                                 buffer_max_size=args.buffer_max_size,
                                 save_freq=args.save_freq, 
