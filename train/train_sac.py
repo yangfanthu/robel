@@ -31,11 +31,15 @@ def eval_policy(policy, env_name, broken_info = False, eval_episodes=5, real_rob
     avg_reward = 0.
     for _ in range(eval_episodes):
         state, done = eval_env.reset(), False
+        if args.trim_state:
+            state = utils.trim_state(state)
         if broken_info:
             state = np.concatenate((state, np.ones(9)))
         while not done:
             action = policy.select_action(np.array(state), 'test')
             state, reward, done, _ = eval_env.step(action)
+            if args.trim_state:
+                state = utils.trim_state(state)
             avg_reward += reward
             if broken_info:
                 state = np.concatenate((state, np.ones(9)))
@@ -88,7 +92,7 @@ if __name__ == "__main__":
     parser.add_argument('--alpha', type=float, default=0.2, metavar='G',
                         help='Temperature parameter α determines the relative importance of the entropy\
                                 term against the reward (default: 0.2)')
-    parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G',
+    parser.add_argument('--automatic_entropy_tuning', type=bool, default=True, metavar='G',
                         help='Automaically adjust α (default: False)')
     parser.add_argument('--target_update_interval', type=int, default=1, metavar='N',
                         help='Value target update per no. of updates per step (default: 1)')
@@ -96,6 +100,7 @@ if __name__ == "__main__":
                         help='learning rate (default: 0.0003)')
     parser.add_argument('--batch_size', type=int, default=256, metavar='N',
                         help='batch size (default: 256)')
+    parser.add_argument('--trim-state', action="store_true", default=True)
     args = parser.parse_args()
     env.seed(args.seed)
     if not os.path.exists('./logs'):
@@ -110,12 +115,15 @@ if __name__ == "__main__":
         # f.writelines("don't fix the broken info bug")
         for each_arg, value in args.__dict__.items():
             f.writelines(each_arg + " : " + str(value)+"\n")
-    writer = SummaryWriter(logdir=('logs/{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
+    writer = SummaryWriter(logdir=('logs/gac{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     state_dim = env.reset().shape[0]
+    if args.trim_state:
+        state_dim -= 9
     original_state_dim = state_dim
+
     if args.broken_info:
         state_dim += 9
     action_dim = env.action_space.sample().shape[0]
@@ -159,6 +167,8 @@ if __name__ == "__main__":
             agent_action[adversarial_action] = -0.6
             next_state, reward, done, info = env.step(agent_action)
             original_next_state = next_state
+            if args.trim_state:
+                next_state = utils.trim_state(next_state)
             if args.broken_info:
                 joint_info = np.ones(9)
                 joint_info[adversarial_action] = 0
@@ -183,6 +193,8 @@ if __name__ == "__main__":
         " the agent training loop"
         broken_joints = collections.deque(maxlen=1)
         current_state = env.reset()
+        if args.trim_state:
+            current_state = utils.trim_state(current_state)
         if args.broken_info:
             joint_info = np.ones(9)
             current_state = np.concatenate((current_state, joint_info))
@@ -220,6 +232,8 @@ if __name__ == "__main__":
             for broken_one in broken_joints:
                 action[broken_one] = args.broken_angle
             next_state, reward, done, info = env.step(action)
+            if args.trim_state:
+                next_state = utils.trim_state(next_state)
             mask = 1 if episode_steps == env._max_episode_steps else float(not done)
             episode_steps += 1
             if args.broken_info:
@@ -237,18 +251,24 @@ if __name__ == "__main__":
                 episode_steps = 0
                 broken_joints = collections.deque(maxlen=1)
                 current_state = env.reset()
+                if args.trim_state:
+                    current_state = utils.trim_state(current_state)
                 if args.broken_info:
                     current_state = np.concatenate((current_state, np.ones(9)))
                 episode += 1
 
 
         current_state = env.reset()
+        if args.trim_state:
+            current_state = utils.trim_state(current_state)
         "the adversary q training loop"
         for i in range(args.adversary_training_steps):
             t += 1
             adversary_t += 1
             action = adversary.select_action(current_state,'train')
             next_state, reward, done, info = step(action[0],current_state)
+            if args.trim_state:
+                next_state = utils.trim_state(next_state)
             reward = -reward  # the adversary's target it to minimize the reward of the agent
             adversary.add_buffer(current_state, action, next_state, reward, done)
             if adversary_t == args.adversary_start_timesteps:
@@ -266,5 +286,7 @@ if __name__ == "__main__":
                 
             if done:
                 current_state = env.reset()
+                if args.trim_state:
+                    current_state = utils.trim_state(current_state)
                 episode += 1
 
