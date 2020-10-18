@@ -209,7 +209,6 @@ class SAC(object):
     def update_parameters(self):
         # Sample a batch from memory
         state_batch, action_batch, next_state_batch, reward_batch, mask_batch = self.replay_buffer.sample(batch_size=self.batch_size)
-
         state_batch = torch.FloatTensor(state_batch).to(self.device)
         next_state_batch = torch.FloatTensor(next_state_batch).to(self.device)
         action_batch = torch.FloatTensor(action_batch).to(self.device)

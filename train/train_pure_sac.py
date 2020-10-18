@@ -3,6 +3,7 @@ import sys
 import copy
 import datetime
 import collections
+import itertools
 import robel
 import gym
 import torch
@@ -20,7 +21,7 @@ from tensorboardX import SummaryWriter
 
 import pdb
 
-def eval_policy(policy, env_name, broken_info = False, eval_episodes=5, real_robot = False, seed = 0):
+def eval_policy(policy, env_name, broken_info = False, eval_episodes=2, real_robot = False, seed = 0):
     env_seed = 2 ** 32 - 1 - seed
     if real_robot:
         eval_env = gym.make(env_name, device_path='/dev/tty.usbserial-FT3WI485')
@@ -36,7 +37,7 @@ def eval_policy(policy, env_name, broken_info = False, eval_episodes=5, real_rob
         if broken_info:
             state = np.concatenate((state, np.ones(9)))
         while not done:
-            action = policy.select_action(np.array(state), 'test')
+            action = policy.select_action(np.array(state), True)
             state, reward, done, _ = eval_env.step(action)
             if args.trim_state:
                 state = utils.trim_state(state)
@@ -58,7 +59,7 @@ if __name__ == "__main__":
     parser.add_argument("--start-timesteps", type=int, default=int(1e4))
     # parser.add_argument("--start-timesteps", type=int, default=int(4))
     parser.add_argument("--max-timesteps", type=int, default=int(1e7))
-    parser.add_argument("--eval-freq", type=int, default=5000)
+    parser.add_argument("--eval-freq", type=int, default=1000)
     parser.add_argument("--save-freq", type=int, default=5000)
     parser.add_argument("--record-freq", type=int, default=5000)
     # parser.add_argument("--eval-freq", type=int, default=1)
@@ -131,55 +132,150 @@ if __name__ == "__main__":
     #     print("restoring the model {}".format(args.restore_step))
     #     ddpg.restore_model_for_train(args.restore_step)
     #     ddpg.index = 0
-    current_state = env.reset()
-    episode = 0
-    t = 0
-    agent_t = 0
-    episode_steps = 0
+    # episode = 0
+    # t = 0
+    # agent_t = 0
+    # episode_steps = 0
     
-    while True:
-        if t > args.max_timesteps:
-            break
+    # for i_episode in itertools.count(1):
+    #     if t > args.max_timesteps:
+    #         break
         
-        " the agent training loop"
-        current_state = env.reset()
-        if args.trim_state:
-            current_state = utils.trim_state(current_state)
-        for i in range(args.agent_training_steps):
-            t += 1
-            agent_t += 1
-            
-            if t % args.eval_freq == 0:
-                print("-------------------------------------------")
-                print("steps:{:07d}".format(t))
-                print("episode:{:07d}".format(episode))
-                avg_reward = eval_policy(agent, 'DClawTurnFixed-v0', broken_info = args.broken_info)
-                writer.add_scalar('/eval/avg_reward',avg_reward, t)
-            
+    #     " the agent training loop"
+    #     current_state = env.reset()
+    #     if args.trim_state:
+    #         current_state = utils.trim_state(current_state)
+    #     t += 1
+    #     agent_t += 1
+        
+    #     if t % args.eval_freq == 0:
+    #         print("-------------------------------------------")
+    #         print("steps:{:07d}".format(t))
+    #         print("episode:{:07d}".format(episode))
+    #         avg_reward = eval_policy(agent, 'DClawTurnFixed-v0', broken_info = args.broken_info)
+    #         writer.add_scalar('/eval/avg_reward',avg_reward, t)
+        
 
-            if agent_t == args.start_timesteps:
-                print("start ddpg learning")
-            if agent_t < args.start_timesteps:
-                original_action = env.action_space.sample()
-            else:
-                original_action = agent.select_action(current_state)
-            action = copy.deepcopy(original_action)
+    #     if agent_t == args.start_timesteps:
+    #         print("start ddpg learning")
+    #     if agent_t < args.start_timesteps:
+    #         action = env.action_space.sample()
+    #     else:
+    #         action = agent.select_action(current_state)
+        
+    #     next_state, reward, done, info = env.step(action)
+    #     if args.trim_state:
+    #         next_state = utils.trim_state(next_state)
+    #     mask = 1 if episode_steps == env._max_episode_steps else float(not done)
+    #     episode_steps += 1
+    #     # suc = info['score/success']
+    #     agent.add_buffer(current_state, action, next_state, reward, done)
+    #     if len(agent.replay_buffer) > args.batch_size:
+    #         agent.update_parameters()
+    #     current_state = next_state
+    #     if done:
+    #         episode_steps = 0
+    #         current_state = env.reset()
+    #         if args.trim_state:
+    #             current_state = utils.trim_state(current_state)
+    #         episode += 1
+
+    # t = 0
+    # for i_episode in itertools.count(1):
+    #     episode_steps = 0
+    #     done = False
+    #     current_state = env.reset()
+    #     if args.trim_state:
+    #         current_state = utils.trim_state(current_state)
+        
+    #     while not done:
+    #         t += 1
+    #         episode_steps += 1
+    #         if t > args.start_timesteps:
+    #             action = agent.select_action(current_state)
+    #         else:
+    #             action = env.action_space.sample()
+    #         if len(agent.replay_buffer) > args.batch_size:
+    #             agent.update_parameters()
             
-            next_state, reward, done, info = env.step(action)
-            if args.trim_state:
-                next_state = utils.trim_state(next_state)
-            mask = 1 if episode_steps == env._max_episode_steps else float(not done)
+    #         next_state, reward, done, _ = env.step(action)
+    #         if args.trim_state:
+    #             next_state = utils.trim_state(next_state)
+    #         mask = 1 if episode_steps == env._max_episode_steps else float(not done)
+    #         agent.add_buffer(current_state, action, next_state, reward, done)
+    #         current_state = next_state
+
+    #         if t % args.eval_freq == 0:
+    #             print("-------------------------------------------")
+    #             print("steps:{:07d}".format(t))
+    #             print("episode:{:07d}".format(i_episode))
+    #             avg_reward = eval_policy(agent, 'DClawTurnFixed-v0', broken_info = args.broken_info)
+    #             writer.add_scalar('/eval/avg_reward',avg_reward, t)
+    total_numsteps = 0
+    updates = 0
+    for i_episode in itertools.count(1):
+        episode_reward = 0
+        episode_steps = 0
+        done = False
+        state = env.reset()
+        state = utils.trim_state(state)
+
+        while not done:
+            if args.start_timesteps > total_numsteps:
+                action = env.action_space.sample()  # Sample random action
+            else:
+                action = agent.select_action(state)  # Sample action from policy
+
+            if len(agent.replay_buffer) > args.batch_size:
+                # Number of updates per step in environment
+                for i in range(1):
+                    # Update parameters of all the networks
+                    critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agent.update_parameters()
+
+                    updates += 1
+
+            next_state, reward, done, _ = env.step(action) # Step
+            next_state = utils.trim_state(next_state)
             episode_steps += 1
-            suc = info['score/success']
-            agent.add_buffer(current_state, original_action, next_state, reward, done)
-            if agent_t > args.start_timesteps:
-                agent.update_parameters()
-            current_state = next_state
-            if done:
-                episode_steps = 0
-                current_state = env.reset()
-                if args.trim_state:
-                    current_state = utils.trim_state(current_state)
-                episode += 1
+            total_numsteps += 1
+            episode_reward += reward
+
+            # Ignore the "done" signal if it comes from hitting the time horizon.
+            # (https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py)
+            mask = 1 if episode_steps == env._max_episode_steps else float(not done)
+            agent.replay_buffer.push(state, action, next_state, reward, mask) # Append transition to memory
+
+            state = next_state
+        writer.add_scalar('reward/train', episode_reward, i_episode)
+        print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
+
+        if i_episode % 10 == 0 and args.eval is True:
+            avg_reward = 0.
+            episodes = 10
+            for _  in range(episodes):
+                state = env.reset()
+                state = utils.trim_state(state)
+                episode_reward = 0
+                done = False
+                while not done:
+                    action = agent.select_action(state, evaluate=True)
+
+                    next_state, reward, done, _ = env.step(action)
+                    next_state = utils.trim_state(next_state)
+                    episode_reward += reward
+
+
+                    state = next_state
+                avg_reward += episode_reward
+            avg_reward /= episodes
+
+
+            writer.add_scalar('avg_reward/test', avg_reward, i_episode)
+            print("----------------------------------------")
+            print("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(avg_reward, 2)))
+            print("----------------------------------------")
+
+    env.close()
+
 
 
