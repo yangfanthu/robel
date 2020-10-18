@@ -61,7 +61,7 @@ if __name__ == "__main__":
     # parser.add_argument("--start-timesteps", type=int, default=int(256))
     # parser.add_argument("--adversary-start-timesteps", type=int, default=int(256))
     parser.add_argument("--max-timesteps", type=int, default=int(1e7))
-    parser.add_argument("--eval-freq", type=int, default=20)
+    parser.add_argument("--eval-freq", type=int, default=40)
     parser.add_argument("--save-freq", type=int, default=5000)
     parser.add_argument("--record-freq", type=int, default=5000)
     # parser.add_argument("--eval-freq", type=int, default=1)
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     # parser.add_argument("--record-freq", type=int, default=1)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--buffer-max-size", type=int, default=int(1e6))
-    parser.add_argument("--agent-training-episodes", type=int, default=int(1))
+    parser.add_argument("--agent-training-episodes", type=int, default=int(2))
     parser.add_argument("--adversary-training-episodes", type=int,default=int(1))
     parser.add_argument("--restore-step", type=int, default=0)
     parser.add_argument("--broken-timesteps", type=int, default=1)
@@ -110,7 +110,7 @@ if __name__ == "__main__":
     outdir = os.path.join('./saved_models', outdir)
     os.system('mkdir ' + outdir)
     with open(outdir+'/setting.txt','w') as f:
-        # f.writelines("fix the broken info bug")
+        f.writelines("fix the broken info bug")
         # f.writelines("don't fix the broken info bug")
         for each_arg, value in args.__dict__.items():
             f.writelines(each_arg + " : " + str(value)+"\n")
@@ -257,7 +257,7 @@ if __name__ == "__main__":
                 action = adversary.select_action(current_state,'train')
                 next_state, reward, done, info = step(action[0],current_state)
                 episode_steps += 1
-                mask = 1 if episode_steps == env._max_episode_steps else float(not done)
+                mask = 0 if episode_steps == env._max_episode_steps else float(done) # it's different, because my replay buffer adds done instead of not done
                 if args.trim_state:
                     next_state = utils.trim_state(next_state)
                 reward = -reward  # the adversary's target it to minimize the reward of the agent
