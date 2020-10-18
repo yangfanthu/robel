@@ -10,6 +10,7 @@ import torch.nn as nn
 import gym
 import numpy as np
 import argparse
+import itertools
 
 
 from modules import *
@@ -20,7 +21,7 @@ from tensorboardX import SummaryWriter
 
 import pdb
 
-def eval_policy(policy, env_name, broken_info = False, eval_episodes=5, real_robot = False, seed = 0):
+def eval_policy(policy, env_name, broken_info = False, eval_episodes=3, real_robot = False, seed = 0):
     env_seed = 2 ** 32 - 1 - seed
     if real_robot:
         eval_env = gym.make(env_name, device_path='/dev/tty.usbserial-FT3WI485')
@@ -36,7 +37,7 @@ def eval_policy(policy, env_name, broken_info = False, eval_episodes=5, real_rob
         if broken_info:
             state = np.concatenate((state, np.ones(9)))
         while not done:
-            action = policy.select_action(np.array(state), 'test')
+            action = policy.select_action(np.array(state), evaluate=True)
             state, reward, done, _ = eval_env.step(action)
             if args.trim_state:
                 state = utils.trim_state(state)
@@ -57,10 +58,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-timesteps", type=int, default=int(1e4))
     parser.add_argument("--adversary-start-timesteps", type=int, default=int(1e4))
-    # parser.add_argument("--start-timesteps", type=int, default=int(4))
-    # parser.add_argument("--adversary-start-timesteps", type=int, default=int(4))
+    # parser.add_argument("--start-timesteps", type=int, default=int(256))
+    # parser.add_argument("--adversary-start-timesteps", type=int, default=int(256))
     parser.add_argument("--max-timesteps", type=int, default=int(1e7))
-    parser.add_argument("--eval-freq", type=int, default=5000)
+    parser.add_argument("--eval-freq", type=int, default=20)
     parser.add_argument("--save-freq", type=int, default=5000)
     parser.add_argument("--record-freq", type=int, default=5000)
     # parser.add_argument("--eval-freq", type=int, default=1)
@@ -68,10 +69,8 @@ if __name__ == "__main__":
     # parser.add_argument("--record-freq", type=int, default=1)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--buffer-max-size", type=int, default=int(1e6))
-    parser.add_argument("--agent-training-steps", type=int, default=int(5000))
-    parser.add_argument("--adversary-training-steps", type=int,default=int(5000))
-    # parser.add_argument("--agent-training-steps", type=int, default=int(2))
-    # parser.add_argument("--adversary-training-steps", type=int,default=int(2))
+    parser.add_argument("--agent-training-episodes", type=int, default=int(1))
+    parser.add_argument("--adversary-training-episodes", type=int,default=int(1))
     parser.add_argument("--restore-step", type=int, default=0)
     parser.add_argument("--broken-timesteps", type=int, default=1)
     parser.add_argument("--hidden-size", type=int, default=512)
@@ -163,7 +162,7 @@ if __name__ == "__main__":
         total_done = False
         reward_list = []
         for i in range(args.broken_timesteps):
-            agent_action = agent.select_action(current_state, 'test')
+            agent_action = agent.select_action(current_state, evaluate=True)
             agent_action[adversarial_action] = -0.6
             next_state, reward, done, info = env.step(agent_action)
             original_next_state = next_state
@@ -184,109 +183,95 @@ if __name__ == "__main__":
     t = 0
     agent_t = 0
     adversary_t = 0
-    episode_steps = 0
     
-    while True:
+    done = False
+    
+    for i_episode in itertools.count(1):
         if t > args.max_timesteps:
             break
-        
-        " the agent training loop"
-        broken_joints = collections.deque(maxlen=1)
-        current_state = env.reset()
-        if args.trim_state:
-            current_state = utils.trim_state(current_state)
-        if args.broken_info:
-            joint_info = np.ones(9)
-            current_state = np.concatenate((current_state, joint_info))
-        for i in range(args.agent_training_steps):
-            t += 1
-            agent_t += 1
-            
-            if t % args.eval_freq == 0:
-                print("-------------------------------------------")
-                print("steps:{:07d}".format(t))
-                print("episode:{:07d}".format(episode))
-                avg_reward = eval_policy(agent, 'DClawTurnFixed-v0', broken_info = args.broken_info)
-                writer.add_scalar('/eval/avg_reward',avg_reward, t)
-            
-            "preprocess the state"
-            if agent_t % args.broken_timesteps == 0 and agent_t > args.start_timesteps:
-                if args.broken_info:
-                    adversary_action = adversary.select_action(current_state[:original_state_dim],'test')
-                else:
-                    adversary_action = adversary.select_action(current_state,'test')
-                broken_joints.append(adversary_action[0])
-            if args.broken_info:
-                for broken_one in broken_joints:
-                    current_state[original_state_dim + broken_one] = 0
-            
-
-            if agent_t == args.start_timesteps:
-                print("start ddpg learning")
-            if agent_t < args.start_timesteps:
-                original_action = env.action_space.sample()
-            else:
-                original_action = agent.select_action(current_state)
-            action = copy.deepcopy(original_action)
-            
-            for broken_one in broken_joints:
-                action[broken_one] = args.broken_angle
-            next_state, reward, done, info = env.step(action)
+        for agent_episode in range(args.agent_training_episodes):
+            done = False
+            " the agent training loop"
+            broken_joints = collections.deque(maxlen=1)
+            current_state = env.reset()
             if args.trim_state:
-                next_state = utils.trim_state(next_state)
-            mask = 1 if episode_steps == env._max_episode_steps else float(not done)
-            episode_steps += 1
+                current_state = utils.trim_state(current_state)
             if args.broken_info:
-                next_state = np.concatenate((next_state, np.ones(9)))
-                for broken_one in broken_joints:
-                    next_state[broken_one + original_state_dim] = 0
-            suc = info['score/success']
-            agent.add_buffer(current_state, original_action, next_state, reward, done)
-            if agent_t > args.start_timesteps:
-                agent.update_parameters()
-            current_state = next_state
-            "fix the bug"
-            current_state[original_state_dim:] = 1
-            if done:
-                episode_steps = 0
-                broken_joints = collections.deque(maxlen=1)
-                current_state = env.reset()
-                if args.trim_state:
-                    current_state = utils.trim_state(current_state)
-                if args.broken_info:
-                    current_state = np.concatenate((current_state, np.ones(9)))
-                episode += 1
+                joint_info = np.ones(9)
+                current_state = np.concatenate((current_state, joint_info))
+            episode_steps = 0
 
-
-        current_state = env.reset()
-        if args.trim_state:
-            current_state = utils.trim_state(current_state)
-        "the adversary q training loop"
-        for i in range(args.adversary_training_steps):
-            t += 1
-            adversary_t += 1
-            action = adversary.select_action(current_state,'train')
-            next_state, reward, done, info = step(action[0],current_state)
-            if args.trim_state:
-                next_state = utils.trim_state(next_state)
-            reward = -reward  # the adversary's target it to minimize the reward of the agent
-            adversary.add_buffer(current_state, action, next_state, reward, done)
-            if adversary_t == args.adversary_start_timesteps:
-                print("start training the adversary!")
-            if adversary_t > args.adversary_start_timesteps:
-                adversary.train()
-            current_state = next_state
-
-            if t % args.eval_freq == 0:
-                print("-------------------------------------------")
-                print("steps:{:07d}".format(t))
-                print("episode:{:07d}".format(episode))
-                avg_reward = eval_policy(agent, 'DClawTurnFixed-v0', broken_info = args.broken_info)
-                writer.add_scalar('/eval/avg_reward',avg_reward, t)
+            while not done:
+                t += 1
+                agent_t += 1
                 
-            if done:
-                current_state = env.reset()
+                
+                "preprocess the state"
+                if agent_t % args.broken_timesteps == 0 and agent_t > args.start_timesteps:
+                    if args.broken_info:
+                        adversary_action = adversary.select_action(current_state[:original_state_dim],'test')
+                    else:
+                        adversary_action = adversary.select_action(current_state,'test')
+                    broken_joints.append(adversary_action[0])
+                if args.broken_info:
+                    for broken_one in broken_joints:
+                        current_state[original_state_dim + broken_one] = 0
+                
+                if agent_t == args.start_timesteps:
+                    print("start ddpg learning")
+                if agent_t < args.start_timesteps:
+                    original_action = env.action_space.sample()
+                else:
+                    original_action = agent.select_action(current_state, evaluate=False)
+                action = copy.deepcopy(original_action)
+                
+                for broken_one in broken_joints:
+                    action[broken_one] = args.broken_angle
+                next_state, reward, done, info = env.step(action)
+                episode_steps += 1
+                mask = 1 if episode_steps == env._max_episode_steps else float(not done)
                 if args.trim_state:
-                    current_state = utils.trim_state(current_state)
-                episode += 1
+                    next_state = utils.trim_state(next_state)
+                if args.broken_info:
+                    next_state = np.concatenate((next_state, np.ones(9)))
+                    for broken_one in broken_joints:
+                        next_state[original_state_dim + broken_one] = 0
+                # suc = info['score/success']
+                agent.add_buffer(current_state, original_action, next_state, reward, mask)
+                if agent_t > args.start_timesteps:
+                    agent.update_parameters()
+                current_state = next_state
+                "fix the bug"
+                current_state[original_state_dim:] = 1
+
+        for adversary_episode in range(args.adversary_training_episodes):
+            current_state = env.reset()
+            if args.trim_state:
+                current_state = utils.trim_state(current_state)
+            "the adversary q training loop"
+            done = False
+            episode_steps = 0
+            while not done:
+                t += 1
+                adversary_t += 1
+                action = adversary.select_action(current_state,'train')
+                next_state, reward, done, info = step(action[0],current_state)
+                episode_steps += 1
+                mask = 1 if episode_steps == env._max_episode_steps else float(not done)
+                if args.trim_state:
+                    next_state = utils.trim_state(next_state)
+                reward = -reward  # the adversary's target it to minimize the reward of the agent
+                adversary.add_buffer(current_state, action, next_state, reward, mask)
+                if adversary_t == args.adversary_start_timesteps:
+                    print("start training the adversary!")
+                if adversary_t > args.adversary_start_timesteps:
+                    adversary.train()
+                current_state = next_state
+
+        if i_episode % args.eval_freq == 0:
+            print("-------------------------------------------")
+            print("steps:{:07d}".format(t))
+            print("episode:{:07d}".format(i_episode))
+            avg_reward = eval_policy(agent, 'DClawTurnFixed-v0', broken_info = args.broken_info)
+            writer.add_scalar('/eval/avg_reward',avg_reward, i_episode)
 

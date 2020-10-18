@@ -180,78 +180,37 @@ if __name__ == "__main__":
     #             current_state = utils.trim_state(current_state)
     #         episode += 1
 
-    # t = 0
-    # for i_episode in itertools.count(1):
-    #     episode_steps = 0
-    #     done = False
-    #     current_state = env.reset()
-    #     if args.trim_state:
-    #         current_state = utils.trim_state(current_state)
-        
-    #     while not done:
-    #         t += 1
-    #         episode_steps += 1
-    #         if t > args.start_timesteps:
-    #             action = agent.select_action(current_state)
-    #         else:
-    #             action = env.action_space.sample()
-    #         if len(agent.replay_buffer) > args.batch_size:
-    #             agent.update_parameters()
-            
-    #         next_state, reward, done, _ = env.step(action)
-    #         if args.trim_state:
-    #             next_state = utils.trim_state(next_state)
-    #         mask = 1 if episode_steps == env._max_episode_steps else float(not done)
-    #         agent.add_buffer(current_state, action, next_state, reward, done)
-    #         current_state = next_state
-
-    #         if t % args.eval_freq == 0:
-    #             print("-------------------------------------------")
-    #             print("steps:{:07d}".format(t))
-    #             print("episode:{:07d}".format(i_episode))
-    #             avg_reward = eval_policy(agent, 'DClawTurnFixed-v0', broken_info = args.broken_info)
-    #             writer.add_scalar('/eval/avg_reward',avg_reward, t)
-    total_numsteps = 0
-    updates = 0
+    t = 0
     for i_episode in itertools.count(1):
-        episode_reward = 0
         episode_steps = 0
         done = False
-        state = env.reset()
-        state = utils.trim_state(state)
-
+        current_state = env.reset()
+        if args.trim_state:
+            current_state = utils.trim_state(current_state)
+        
         while not done:
-            if args.start_timesteps > total_numsteps:
-                action = env.action_space.sample()  # Sample random action
-            else:
-                action = agent.select_action(state)  # Sample action from policy
-
-            if len(agent.replay_buffer) > args.batch_size:
-                # Number of updates per step in environment
-                for i in range(1):
-                    # Update parameters of all the networks
-                    critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agent.update_parameters()
-
-                    updates += 1
-
-            next_state, reward, done, _ = env.step(action) # Step
-            next_state = utils.trim_state(next_state)
+            t += 1
             episode_steps += 1
-            total_numsteps += 1
-            episode_reward += reward
-
-            # Ignore the "done" signal if it comes from hitting the time horizon.
-            # (https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py)
+            if t > args.start_timesteps:
+                action = agent.select_action(current_state)
+            else:
+                action = env.action_space.sample()
+            if len(agent.replay_buffer) > args.batch_size:
+                agent.update_parameters()
+            
+            next_state, reward, done, _ = env.step(action)
+            if args.trim_state:
+                next_state = utils.trim_state(next_state)
             mask = 1 if episode_steps == env._max_episode_steps else float(not done)
-            agent.replay_buffer.push(state, action, next_state, reward, mask) # Append transition to memory
-
-            state = next_state
-        writer.add_scalar('reward/train', episode_reward, i_episode)
-        print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
+            
+            agent.add_buffer(current_state, action, next_state, reward, mask)
+            current_state = next_state
 
         if i_episode % 10 == 0 and args.eval is True:
-            avg_reward = 0.
-            episodes = 10
+            print(t)
+            print("episode{}".format(i_episode))
+            avg_reward = 0
+            episodes = 5
             for _  in range(episodes):
                 state = env.reset()
                 state = utils.trim_state(state)
@@ -269,11 +228,80 @@ if __name__ == "__main__":
                 avg_reward += episode_reward
             avg_reward /= episodes
 
-
             writer.add_scalar('avg_reward/test', avg_reward, i_episode)
             print("----------------------------------------")
             print("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(avg_reward, 2)))
             print("----------------------------------------")
+
+
+    # total_numsteps = 0
+    # for i_episode in itertools.count(1):
+    #     episode_reward = 0
+    #     episode_steps = 0
+    #     done = False
+    #     state = env.reset()
+    #     state = utils.trim_state(state)
+
+    #     while not done:
+    #         if args.start_timesteps > total_numsteps:
+    #             action = env.action_space.sample()  # Sample random action
+    #         else:
+    #             action = agent.select_action(state)  # Sample action from policy
+
+    #         if len(agent.replay_buffer) > args.batch_size:
+    #             # Number of updates per step in environment
+    #             for i in range(1):
+    #                 # Update parameters of all the networks
+    #                 critic_1_loss, critic_2_loss, policy_loss, ent_loss, alpha = agent.update_parameters()
+
+
+    #         next_state, reward, done, _ = env.step(action) # Step
+    #         next_state = utils.trim_state(next_state)
+    #         episode_steps += 1
+    #         total_numsteps += 1
+    #         episode_reward += reward
+
+    #         # Ignore the "done" signal if it comes from hitting the time horizon.
+    #         # (https://github.com/openai/spinningup/blob/master/spinup/algos/sac/sac.py)
+    #         mask = 1 if episode_steps == env._max_episode_steps else float(not done)
+    #         agent.replay_buffer.push(state, action, next_state, reward, mask) # Append transition to memory
+
+    #         state = next_state
+    #     writer.add_scalar('reward/train', episode_reward, i_episode)
+    #     print("Episode: {}, total numsteps: {}, episode steps: {}, reward: {}".format(i_episode, total_numsteps, episode_steps, round(episode_reward, 2)))
+
+    #     if i_episode % 10 == 0 and args.eval is True:
+            # print("-------------------------------------------")
+            # print("steps:{:07d}".format(total_numsteps))
+            # print("episode:{:07d}".format(i_episode))
+            # avg_reward = eval_policy(agent, 'DClawTurnFixed-v0', broken_info = args.broken_info)
+            # writer.add_scalar('/eval/avg_reward',avg_reward, total_numsteps)
+
+            "original evaluate code"
+            # avg_reward = 0.
+            # episodes = 10
+            # for _  in range(episodes):
+            #     state = env.reset()
+            #     state = utils.trim_state(state)
+            #     episode_reward = 0
+            #     done = False
+            #     while not done:
+            #         action = agent.select_action(state, evaluate=True)
+
+            #         next_state, reward, done, _ = env.step(action)
+            #         next_state = utils.trim_state(next_state)
+            #         episode_reward += reward
+
+
+            #         state = next_state
+            #     avg_reward += episode_reward
+            # avg_reward /= episodes
+
+
+            # writer.add_scalar('avg_reward/test', avg_reward, i_episode)
+            # print("----------------------------------------")
+            # print("Test Episodes: {}, Avg. Reward: {}".format(episodes, round(avg_reward, 2)))
+            # print("----------------------------------------")
 
     env.close()
 
