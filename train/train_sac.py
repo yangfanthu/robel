@@ -61,7 +61,7 @@ if __name__ == "__main__":
     # parser.add_argument("--start-timesteps", type=int, default=int(256))
     # parser.add_argument("--adversary-start-timesteps", type=int, default=int(256))
     parser.add_argument("--max-timesteps", type=int, default=int(1e7))
-    parser.add_argument("--eval-freq", type=int, default=40)
+    parser.add_argument("--eval-freq", type=int, default=20)
     parser.add_argument("--save-freq", type=int, default=5000)
     parser.add_argument("--record-freq", type=int, default=5000)
     # parser.add_argument("--eval-freq", type=int, default=1)
@@ -241,8 +241,8 @@ if __name__ == "__main__":
                 if agent_t > args.start_timesteps:
                     agent.update_parameters()
                 current_state = next_state
-                "fix the bug"
-                current_state[original_state_dim:] = 1
+                # "fix the bug"
+                # current_state[original_state_dim:] = 1
 
         for adversary_episode in range(args.adversary_training_episodes):
             current_state = env.reset()
