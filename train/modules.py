@@ -264,23 +264,37 @@ class SAC(object):
             self.writer.add_scalar('loss/policy', policy_loss.item(), self.index)
             self.writer.add_scalar('loss/entropy_loss', alpha_loss.item(), self.index)
             self.writer.add_scalar('entropy_temprature/alpha', alpha_tlogs.item(), self.index)
+        if self.index % args.save_freq == 0:
+            self.save_model()
 
         self.index += 1
         return qf1_loss.item(), qf2_loss.item(), policy_loss.item(), alpha_loss.item(), alpha_tlogs.item()
 
     # Save model parameters
-    def save_model(self, suffix="", actor_path=None, critic_path=None):
-        if not os.path.exists('saved_models/'):
-            os.makedirs('saved_models/')
-
-        if actor_path is None:
-            actor_path = "saved_models/sac_actor_{}".format(suffix)
-        if critic_path is None:
-            critic_path = "saved_models/sac_critic_{}".format(suffix)
-        print('Saving models to {} and {}'.format(actor_path, critic_path))
-        torch.save(self.policy.state_dict(), actor_path)
-        torch.save(self.critic.state_dict(), critic_path)
-
+    # def save_model(self, suffix="", actor_path=None, critic_path=None):
+    #     if not os.path.exists('saved_models/'):
+    #         os.makedirs('saved_models/')
+    #     if actor_path is None:
+    #         actor_path = "saved_models/sac_actor_{}".format(suffix)
+    #     if critic_path is None:
+    #         critic_path = "saved_models/sac_critic_{}".format(suffix)
+    #     print('Saving models to {} and {}'.format(actor_path, critic_path))
+    #     torch.save(self.policy.state_dict(), actor_path)
+    #     torch.save(self.critic.state_dict(), critic_path)
+    def save_model(self):
+        print('saving...')
+        if self.outdir != None:
+            torch.save(self.actor.state_dict(),self.outdir + '/actor_{:07d}.ckpt'.format(self.index))
+            torch.save(self.critic.state_dict(),self.outdir + '/critic_{:07d}.ckpt'.format(self.index))
+            torch.save(self.actor_target.state_dict(),self.outdir + '/actor_target_{:07d}.ckpt'.format(self.index))
+            torch.save(self.critic_target.state_dict(),self.outdir + '/critic_target_{:07d}.ckpt'.format(self.index))
+        else:
+            torch.save(self.actor.state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
+            torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
+            torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
+            torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
+        self.replay_buffer.save()
+        print('finish saving')
     # Load model parameters
     def load_model(self, actor_path, critic_path):
         print('Loading models from {} and {}'.format(actor_path, critic_path))
@@ -288,6 +302,10 @@ class SAC(object):
             self.policy.load_state_dict(torch.load(actor_path, map_location=self.device))
         if critic_path is not None:
             self.critic.load_state_dict(torch.load(critic_path, map_location=self.device))
+    def restore_model_for_test(self, index):
+        self.policy.load_state_dict(torch.load('./saved_models/actor_{:07d}.ckpt'.format(index), map_location = self.device))
+        # self.critic.load_state_dict(torch.load('./saved_models/critic_{:07d}.ckpt'.format(index), map_location = self.device))
+        print('finish restoring model')
 
 
 class Critic(torch.nn.Module):
