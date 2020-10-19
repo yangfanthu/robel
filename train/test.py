@@ -85,15 +85,16 @@ if __name__ == "__main__":
                 writer=None,
                 outdir=None,
                 device=device)
-    agent.restore_model_for_test(225000) #340000 good, but doesn't work on 5 and 7
+    agent.restore_model_for_test(730000) #340000 good, but doesn't work on 5 and 7
     # 410000 works for all, not so good for 5 and 7
+    #trivial 225000 works perfect!!
     adversary = AdversarialDQN(original_state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
     # adversary.restore_model(2495000)
     current_state = env.reset()
     if args.trim_state:
         current_state = utils.trim_state(current_state)
 
-    broken_joints = [3,4,5,6,7,8] # 5 doesn't work
+    broken_joints = [0,1,2,6,7,8] # 5 doesn't work
 
     if args.broken_info:
         current_state = np.concatenate((current_state, np.ones(9)))
