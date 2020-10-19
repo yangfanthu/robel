@@ -110,7 +110,7 @@ if __name__ == "__main__":
     os.system('mkdir ' + outdir)
     with open(outdir+'/setting.txt','w') as f:
         # f.writelines("fix the broken info bug\n")
-        f.writelines("don't fix the broken info bug\n")
+        f.writelines("tirvial sac\n")
         for each_arg, value in args.__dict__.items():
             f.writelines(each_arg + " : " + str(value)+"\n")
     writer = SummaryWriter(logdir=('logs/gac{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
@@ -187,7 +187,6 @@ if __name__ == "__main__":
     minimal_index = 0
     
     for i_episode in itertools.count(1):
-        print(minimal_index)
         if t > args.max_timesteps:
             break
         for agent_episode in range(args.agent_training_episodes):

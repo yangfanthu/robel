@@ -85,14 +85,15 @@ if __name__ == "__main__":
                 writer=None,
                 outdir=None,
                 device=device)
-    agent.restore_model_for_test(240000)
+    agent.restore_model_for_test(225000) #340000 good, but doesn't work on 5 and 7
+    # 410000 works for all, not so good for 5 and 7
     adversary = AdversarialDQN(original_state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
     # adversary.restore_model(2495000)
     current_state = env.reset()
     if args.trim_state:
         current_state = utils.trim_state(current_state)
 
-    broken_joints = [] # 5 doesn't work
+    broken_joints = [3,4,5,6,7,8] # 5 doesn't work
 
     if args.broken_info:
         current_state = np.concatenate((current_state, np.ones(9)))
@@ -102,7 +103,7 @@ if __name__ == "__main__":
     sum_reward = 0
     index = 0
     episode = 0
-    #env._max_episode_steps = 200
+    env._max_episode_steps = 200
     with torch.no_grad():
         while True:
             if args.broken_info:

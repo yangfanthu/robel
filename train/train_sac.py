@@ -110,8 +110,8 @@ if __name__ == "__main__":
     outdir = os.path.join('./saved_models', outdir)
     os.system('mkdir ' + outdir)
     with open(outdir+'/setting.txt','w') as f:
-        # f.writelines("fix the broken info bug\n")
-        f.writelines("don't fix the broken info bug\n")
+        f.writelines("fix the broken info bug\n")
+        # f.writelines("don't fix the broken info bug\n")
         for each_arg, value in args.__dict__.items():
             f.writelines(each_arg + " : " + str(value)+"\n")
     writer = SummaryWriter(logdir=('logs/gac{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
@@ -242,7 +242,7 @@ if __name__ == "__main__":
                     agent.update_parameters()
                 current_state = next_state
                 "fix the bug"
-                # current_state[original_state_dim:] = 1
+                current_state[original_state_dim:] = 1
 
         for adversary_episode in range(args.adversary_training_episodes):
             current_state = env.reset()
