@@ -164,6 +164,7 @@ class SAC(object):
         self.writer = writer
         self.outdir = outdir
         self.batch_size = args.batch_size
+        self.save_freq = args.save_freq
 
         self.policy_type = args.policy
         self.target_update_interval = args.target_update_interval
@@ -264,7 +265,7 @@ class SAC(object):
             self.writer.add_scalar('loss/policy', policy_loss.item(), self.index)
             self.writer.add_scalar('loss/entropy_loss', alpha_loss.item(), self.index)
             self.writer.add_scalar('entropy_temprature/alpha', alpha_tlogs.item(), self.index)
-        if self.index % args.save_freq == 0:
+        if self.index % self.save_freq == 0:
             self.save_model()
 
         self.index += 1

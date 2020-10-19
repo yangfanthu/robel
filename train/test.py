@@ -36,15 +36,21 @@ if __name__ == "__main__":
     action_dim = env.action_space.sample().shape[0]
     max_action = env.action_space.high[0]
 
-    ddpg = DDPG(state_dim = state_dim,
-    action_dim = action_dim,
-    buffer_max_size=int(1e6),
-    writer = None,
-    max_action = max_action,
-    device = device,
-    hidden_size=512,
-    broken_info_recap=args.broken_info_recap)
-    ddpg.restore_model_for_test(2135000)
+    # agent = DDPG(state_dim = state_dim,
+    # action_dim = action_dim,
+    # buffer_max_size=int(1e6),
+    # writer = None,
+    # max_action = max_action,
+    # device = device,
+    # hidden_size=512,
+    # broken_info_recap=args.broken_info_recap)
+    agent = SAC(num_inputs=state_dim,
+                action_space=env.action_space,
+                args=args,
+                writer=None,
+                outdir=None,
+                device=device)
+    # agent.restore_model_for_test(2135000)
     adversary = AdversarialDQN(original_state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
     # adversary.restore_model(2495000)
     current_state = env.reset()
@@ -67,7 +73,7 @@ if __name__ == "__main__":
             else:
                 adversary_action = adversary.select_action(current_state, 'test')
             # print(adversary_action)
-            action = ddpg.select_action(current_state, 'test')
+            action = agent.select_action(current_state, 'test')
             index += 1
             for broken_one in broken_joints:
                 action[broken_one] = -0.6
