@@ -91,7 +91,7 @@ if __name__ == "__main__":
     parser.add_argument('--alpha', type=float, default=0.2, metavar='G',
                         help='Temperature parameter α determines the relative importance of the entropy\
                                 term against the reward (default: 0.2)')
-    parser.add_argument('--automatic_entropy_tuning', type=bool, default=True, metavar='G',
+    parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G',
                         help='Automaically adjust α (default: False)')
     parser.add_argument('--target_update_interval', type=int, default=1, metavar='N',
                         help='Value target update per no. of updates per step (default: 1)')
@@ -241,7 +241,7 @@ if __name__ == "__main__":
                 if agent_t > args.start_timesteps:
                     agent.update_parameters()
                 current_state = next_state
-                # "fix the bug"
+                "fix the bug"
                 # current_state[original_state_dim:] = 1
 
         for adversary_episode in range(args.adversary_training_episodes):

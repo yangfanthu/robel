@@ -24,12 +24,47 @@ if __name__ == "__main__":
                         help="whether use broken joints indice as a part of state")
     parser.add_argument("--broken-info-recap", action='store_true', default=False,
                         help='whether to use broken info again in actor module to reinforce the learning')
+    parser.add_argument("--save-freq", type=int, default=5000)
+
+    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--buffer-max-size", type=int, default=int(1e6))
+    parser.add_argument("--agent-training-episodes", type=int, default=int(2))
+    parser.add_argument("--adversary-training-episodes", type=int,default=int(1))
+    parser.add_argument("--restore-step", type=int, default=0)
+    parser.add_argument("--broken-timesteps", type=int, default=1)
+    parser.add_argument("--hidden-size", type=int, default=512)
+    parser.add_argument("--broken-angle", type=float, default=-0.6)
+    parser.add_argument("--std", type=float, default=0.1)
+    parser.add_argument('--gamma', type=float, default=0.99, metavar='G',
+                        help='discount factor for reward (default: 0.99)')
+    parser.add_argument('--tau', type=float, default=0.005, metavar='G',
+                        help='target smoothing coefficient(τ) (default: 0.005)')
+    parser.add_argument('--env-name', default='DClawTurnFixed-v0',
+                        help='Mujoco Gym environment (default: HalfCheetah-v2)')
+    parser.add_argument('--policy', default="Gaussian",
+                        help='Policy Type: Gaussian | Deterministic (default: Gaussian)')
+    parser.add_argument('--eval', type=bool, default=True,
+                        help='Evaluates a policy a policy every 10 episode (default: True)')
+    parser.add_argument('--alpha', type=float, default=0.2, metavar='G',
+                        help='Temperature parameter α determines the relative importance of the entropy\
+                                term against the reward (default: 0.2)')
+    parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, metavar='G',
+                        help='Automaically adjust α (default: False)')
+    parser.add_argument('--target_update_interval', type=int, default=1, metavar='N',
+                        help='Value target update per no. of updates per step (default: 1)')
+    parser.add_argument('--lr', type=float, default=0.0003, metavar='G',
+                        help='learning rate (default: 0.0003)')
+    parser.add_argument('--batch_size', type=int, default=256, metavar='N',
+                        help='batch size (default: 256)')
+    parser.add_argument('--trim-state', action="store_true", default=True)
     args = parser.parse_args()
     if args.broken_info_recap:
         assert args.broken_info
     # device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     device = torch.device('cpu')
     state_dim = env.reset().shape[0]
+    if args.trim_state:
+        state_dim -= 9
     original_state_dim = state_dim
     if args.broken_info:
         state_dim += 9
@@ -50,12 +85,14 @@ if __name__ == "__main__":
                 writer=None,
                 outdir=None,
                 device=device)
-    # agent.restore_model_for_test(2135000)
+    agent.restore_model_for_test(240000)
     adversary = AdversarialDQN(original_state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
     # adversary.restore_model(2495000)
     current_state = env.reset()
+    if args.trim_state:
+        current_state = utils.trim_state(current_state)
 
-    broken_joints = [0,1,2] # 5 doesn't work
+    broken_joints = [8] # 5 doesn't work
 
     if args.broken_info:
         current_state = np.concatenate((current_state, np.ones(9)))
@@ -92,6 +129,8 @@ if __name__ == "__main__":
             # print(joint)
             # print(other)
             next_state, reward, done, info = env.step(action)
+            if args.trim_state:
+                next_state = utils.trim_state(next_state)
             if args.broken_info:
                 next_state = np.concatenate((next_state, np.ones(9)))
                 for broken_one in broken_joints:
@@ -107,6 +146,8 @@ if __name__ == "__main__":
                 current_state = env.reset()
                 if args.broken_info:
                     current_state = np.concatenate((current_state, np.ones(9)))
+                    if args.trim_state:
+                        current_state = utils.trim_state(current_state)
                     for broken_one in broken_joints:
                         current_state[original_state_dim + broken_one] = 0
                 print(sum_reward)
