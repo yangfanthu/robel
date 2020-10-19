@@ -92,7 +92,7 @@ if __name__ == "__main__":
     if args.trim_state:
         current_state = utils.trim_state(current_state)
 
-    broken_joints = [8] # 5 doesn't work
+    broken_joints = [] # 5 doesn't work
 
     if args.broken_info:
         current_state = np.concatenate((current_state, np.ones(9)))
@@ -102,7 +102,7 @@ if __name__ == "__main__":
     sum_reward = 0
     index = 0
     episode = 0
-    env._max_episode_steps = 200
+    #env._max_episode_steps = 200
     with torch.no_grad():
         while True:
             if args.broken_info:
@@ -144,10 +144,11 @@ if __name__ == "__main__":
             if done:
                 episode += 1
                 current_state = env.reset()
+                if args.trim_state:
+                    current_state = utils.trim_state(current_state)
                 if args.broken_info:
                     current_state = np.concatenate((current_state, np.ones(9)))
-                    if args.trim_state:
-                        current_state = utils.trim_state(current_state)
+                
                     for broken_one in broken_joints:
                         current_state[original_state_dim + broken_one] = 0
                 print(sum_reward)
