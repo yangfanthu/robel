@@ -294,7 +294,7 @@ class SAC(object):
             torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
             # torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
             torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
-        self.replay_buffer.save()
+        # self.replay_buffer.save()
         print('finish saving')
     # Load model parameters
     def load_model(self, actor_path, critic_path):
