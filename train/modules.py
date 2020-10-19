@@ -285,14 +285,14 @@ class SAC(object):
     def save_model(self):
         print('saving...')
         if self.outdir != None:
-            torch.save(self.actor.state_dict(),self.outdir + '/actor_{:07d}.ckpt'.format(self.index))
+            torch.save(self.policy.state_dict(),self.outdir + '/actor_{:07d}.ckpt'.format(self.index))
             torch.save(self.critic.state_dict(),self.outdir + '/critic_{:07d}.ckpt'.format(self.index))
-            torch.save(self.actor_target.state_dict(),self.outdir + '/actor_target_{:07d}.ckpt'.format(self.index))
+            # torch.save(self.actor_target.state_dict(),self.outdir + '/actor_target_{:07d}.ckpt'.format(self.index))
             torch.save(self.critic_target.state_dict(),self.outdir + '/critic_target_{:07d}.ckpt'.format(self.index))
         else:
-            torch.save(self.actor.state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
+            torch.save(self.policy.state_dict(),'./saved_models/actor_{:07d}.ckpt'.format(self.index))
             torch.save(self.critic.state_dict(),'./saved_models/critic_{:07d}.ckpt'.format(self.index))
-            torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
+            # torch.save(self.actor_target.state_dict(),'./saved_models/actor_target_{:07d}.ckpt'.format(self.index))
             torch.save(self.critic_target.state_dict(),'./saved_models/critic_target_{:07d}.ckpt'.format(self.index))
         self.replay_buffer.save()
         print('finish saving')
