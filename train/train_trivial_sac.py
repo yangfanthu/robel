@@ -57,9 +57,7 @@ env = gym.make('DClawTurnFixed-v0')
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-timesteps", type=int, default=int(1e4))
-    parser.add_argument("--adversary-start-timesteps", type=int, default=int(1e4))
     # parser.add_argument("--start-timesteps", type=int, default=int(256))
-    # parser.add_argument("--adversary-start-timesteps", type=int, default=int(256))
     parser.add_argument("--max-timesteps", type=int, default=int(1e7))
     parser.add_argument("--eval-freq", type=int, default=20)
     parser.add_argument("--save-freq", type=int, default=5000)
@@ -126,14 +124,6 @@ if __name__ == "__main__":
         state_dim += 9
     action_dim = env.action_space.sample().shape[0]
     max_action = env.action_space.high[0]
-    adversary = AdversarialDQN(state_dim=original_state_dim,
-                               n_actions=action_dim,
-                               device=device,
-                               writer=writer,
-                               buffer_max_size=args.buffer_max_size,
-                               save_freq=args.save_freq,
-                               record_freq=args.record_freq,
-                               outdir=outdir)
     agent = SAC(num_inputs=state_dim,
                 action_space=env.action_space,
                 args=args,

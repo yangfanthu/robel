@@ -57,9 +57,7 @@ env = gym.make('DClawTurnFixed-v0')
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-timesteps", type=int, default=int(1e4))
-    parser.add_argument("--adversary-start-timesteps", type=int, default=int(1e4))
     # parser.add_argument("--start-timesteps", type=int, default=int(256))
-    # parser.add_argument("--adversary-start-timesteps", type=int, default=int(256))
     parser.add_argument("--max-timesteps", type=int, default=int(1e7))
     parser.add_argument("--eval-freq", type=int, default=20)
     parser.add_argument("--save-freq", type=int, default=5000)
@@ -69,7 +67,7 @@ if __name__ == "__main__":
     # parser.add_argument("--record-freq", type=int, default=1)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--buffer-max-size", type=int, default=int(1e6))
-    parser.add_argument("--agent-training-episodes", type=int, default=int(15))
+    parser.add_argument("--agent-training-episodes", type=int, default=int(1))
     parser.add_argument("--restore-step", type=int, default=0)
     parser.add_argument("--broken-timesteps", type=int, default=1)
     parser.add_argument("--hidden-size", type=int, default=512)
@@ -109,8 +107,7 @@ if __name__ == "__main__":
     outdir = os.path.join('./saved_models', outdir)
     os.system('mkdir ' + outdir)
     with open(outdir+'/setting.txt','w') as f:
-        # f.writelines("fix the broken info bug\n")
-        f.writelines("don't fix the broken info bug\n")
+        f.writelines("model based sac\n")
         for each_arg, value in args.__dict__.items():
             f.writelines(each_arg + " : " + str(value)+"\n")
     writer = SummaryWriter(logdir=('logs/gac{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
@@ -126,26 +123,19 @@ if __name__ == "__main__":
         state_dim += 9
     action_dim = env.action_space.sample().shape[0]
     max_action = env.action_space.high[0]
-    adversary = AdversarialDQN(state_dim=original_state_dim,
-                               n_actions=action_dim,
-                               device=device,
-                               writer=writer,
-                               buffer_max_size=args.buffer_max_size,
-                               save_freq=args.save_freq,
-                               record_freq=args.record_freq,
-                               outdir=outdir)
-    agent = SAC(num_inputs=state_dim,
+
+    agent = MBSAC(num_inputs=state_dim,
                 action_space=env.action_space,
                 args=args,
                 writer=writer,
                 outdir=outdir,
                 device=device)
+    agent.load_pretrained_model()
     "advesarial agent code"
     # if args.restore_step:
     #     print("restoring the model {}".format(args.restore_step))
     #     ddpg.restore_model_for_train(args.restore_step)
     #     ddpg.index = 0
-    #     adversary.restore_model(args.restore_step)
     current_state = env.reset()
     if args.broken_info:
         joint_info = np.ones(9)
@@ -187,7 +177,6 @@ if __name__ == "__main__":
     minimal_index = 0
     
     for i_episode in itertools.count(1):
-        print(minimal_index)
         if t > args.max_timesteps:
             break
         for agent_episode in range(args.agent_training_episodes):
@@ -226,6 +215,8 @@ if __name__ == "__main__":
                     next_state[original_state_dim + minimal_index] = 0
                 # suc = info['score/success']
                 agent.add_buffer(current_state, original_action, next_state, reward, mask)
+                agent.add_model_buffer(current_state, action, next_state, reward, done)
+
                 if agent_t > args.start_timesteps:
                     agent.update_parameters()
                 current_state = next_state
