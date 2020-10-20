@@ -140,26 +140,29 @@ if __name__ == "__main__":
     if args.broken_info:
         joint_info = np.ones(9)
         current_state = np.concatenate((current_state, joint_info))
-    def step(adversarial_action: int, current_state):
+    def step(adversarial_actions: int, current_state):
         "input obs obs is processed and its broken info must be all 1s"
         "return unprocessed next_state"
         if args.broken_info:
             current_state = np.concatenate((current_state, np.ones(9)))
-            current_state[original_state_dim + adversarial_action] = 0
+            for ad_action in adversarial_actions:
+                current_state[original_state_dim + ad_action] = 0
         # broken_timesteps = 1
         
         total_done = False
         reward_list = []
         for i in range(args.broken_timesteps):
             agent_action = agent.select_action(current_state, evaluate=True)
-            agent_action[adversarial_action] = -0.6
+            for ad_action in adversarial_actions:
+                agent_action[ad_action] = -0.6
             next_state, reward, done, info = env.step(agent_action)
             original_next_state = next_state
             if args.trim_state:
                 next_state = utils.trim_state(next_state)
             if args.broken_info:
                 joint_info = np.ones(9)
-                joint_info[adversarial_action] = 0
+                for ad_action in adversarial_actions:
+                    joint_info[ad_action] = 0
                 next_state = np.concatenate((next_state, joint_info))
             reward_list.append(reward)
             if done:
@@ -174,7 +177,7 @@ if __name__ == "__main__":
     adversary_t = 0
     
     done = False
-    minimal_index = 0
+    minimal_indexes = [0,0]
     
     for i_episode in itertools.count(1):
         if t > args.max_timesteps:
@@ -182,7 +185,6 @@ if __name__ == "__main__":
         for agent_episode in range(args.agent_training_episodes):
             done = False
             " the agent training loop"
-            broken_joints = collections.deque(maxlen=1)
             current_state = env.reset()
             if args.trim_state:
                 current_state = utils.trim_state(current_state)
@@ -195,7 +197,8 @@ if __name__ == "__main__":
                 t += 1
                 agent_t += 1
                 if args.broken_info:
-                    current_state[original_state_dim + minimal_index] = 0
+                    for minimal_index in minimal_indexes:
+                        current_state[original_state_dim + minimal_index] = 0
                 
                 if agent_t == args.start_timesteps:
                     print("start ddpg learning")
@@ -204,7 +207,8 @@ if __name__ == "__main__":
                 else:
                     original_action = agent.select_action(current_state, evaluate=False)
                 action = copy.deepcopy(original_action)
-                action[minimal_index] = args.broken_angle
+                for minimal_index in minimal_indexes:
+                    action[minimal_index] = args.broken_angle
                 next_state, reward, done, info = env.step(action)
                 episode_steps += 1
                 mask = 1 if episode_steps == env._max_episode_steps else float(not done)
@@ -212,7 +216,8 @@ if __name__ == "__main__":
                     next_state = utils.trim_state(next_state)
                 if args.broken_info:
                     next_state = np.concatenate((next_state, np.ones(9)))
-                    next_state[original_state_dim + minimal_index] = 0
+                    for minimal_index in minimal_indexes:
+                        next_state[original_state_dim + minimal_index] = 0
                 # suc = info['score/success']
                 agent.add_buffer(current_state, original_action, next_state, reward, mask)
                 if agent_t > args.start_timesteps:
@@ -228,7 +233,7 @@ if __name__ == "__main__":
                 current_state = utils.trim_state(current_state)
 
             while not done:
-                next_state, reward, done, info = step(i, current_state)
+                next_state, reward, done, info = step([i], current_state)
                 if args.trim_state:
                     next_state = utils.trim_state(next_state)
                 sum_reward += reward
@@ -237,6 +242,31 @@ if __name__ == "__main__":
         performance_list = np.array(performance_list)
         minimal_index = np.where(performance_list == performance_list.min())
         minimal_index = minimal_index[0][0]
+
+        performance_list = []
+        for i in range(action_dim):
+            if i  == minimal_index:
+                performance_list.append(99999)
+                continue
+            broken_list = [minimal_index, i]
+            done = False
+            current_state = env.reset()
+            sum_reward = 0
+            if args.trim_state:
+                current_state = utils.trim_state(current_state)
+
+            while not done:
+                next_state, reward, done, info = step(broken_list, current_state)
+                if args.trim_state:
+                    next_state = utils.trim_state(next_state)
+                sum_reward += reward
+                current_state = next_state
+            performance_list.append(sum_reward)
+        performance_list = np.array(performance_list)
+        second_minimal_index = np.where(performance_list == performance_list.min())
+        second_minimal_index = second_minimal_index[0][0]
+
+        minimal_indexes = [minimal_index, second_minimal_index]
 
         if i_episode % args.eval_freq == 0:
             print("-------------------------------------------")
