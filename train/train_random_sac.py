@@ -219,7 +219,7 @@ if __name__ == "__main__":
                     agent.update_parameters()
                 current_state = next_state
 
-        minimal_index = random.randint(0,9)
+        minimal_index = random.randint(0,8)
 
         if i_episode % args.eval_freq == 0:
             print("-------------------------------------------")
