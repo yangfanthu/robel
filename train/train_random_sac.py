@@ -108,7 +108,7 @@ if __name__ == "__main__":
     os.system('mkdir ' + outdir)
     with open(outdir+'/setting.txt','w') as f:
         # f.writelines("fix the broken info bug\n")
-        f.writelines("tirvial sac\n")
+        f.writelines("using random adversary sac\n")
         for each_arg, value in args.__dict__.items():
             f.writelines(each_arg + " : " + str(value)+"\n")
     writer = SummaryWriter(logdir=('logs/gac{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
@@ -219,24 +219,7 @@ if __name__ == "__main__":
                     agent.update_parameters()
                 current_state = next_state
 
-        performance_list = []
-        for i in range(action_dim):
-            done = False
-            current_state = env.reset()
-            sum_reward = 0
-            if args.trim_state:
-                current_state = utils.trim_state(current_state)
-
-            while not done:
-                next_state, reward, done, info = step(i, current_state)
-                if args.trim_state:
-                    next_state = utils.trim_state(next_state)
-                sum_reward += reward
-                current_state = next_state
-            performance_list.append(sum_reward)
-        performance_list = np.array(performance_list)
-        minimal_index = np.where(performance_list == performance_list.min())
-        minimal_index = minimal_index[0][0]
+        minimal_index = random.randint(0,9)
 
         if i_episode % args.eval_freq == 0:
             print("-------------------------------------------")
