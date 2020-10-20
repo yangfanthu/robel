@@ -71,7 +71,7 @@ if __name__ == "__main__":
     parser.add_argument("--restore-step", type=int, default=0)
     parser.add_argument("--broken-timesteps", type=int, default=1)
     parser.add_argument("--hidden-size", type=int, default=512)
-    parser.add_argument("--broken-info", action='store_true', default=True,
+    parser.add_argument("--broken-info", type=bool, default=False,
                         help="whether use broken joints indice as a part of state")
     parser.add_argument("--broken-angle", type=float, default=-0.6)
     parser.add_argument("--std", type=float, default=0.1)
@@ -96,7 +96,7 @@ if __name__ == "__main__":
                         help='learning rate (default: 0.0003)')
     parser.add_argument('--batch_size', type=int, default=256, metavar='N',
                         help='batch size (default: 256)')
-    parser.add_argument('--trim-state', action="store_true", default=True)
+    parser.add_argument('--trim-state', type=bool, default=True)
     args = parser.parse_args()
     env.seed(args.seed)
     if not os.path.exists('./logs'):
