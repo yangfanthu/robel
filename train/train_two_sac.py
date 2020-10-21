@@ -61,7 +61,7 @@ if __name__ == "__main__":
     parser.add_argument("--max-timesteps", type=int, default=int(1e7))
     parser.add_argument("--eval-freq", type=int, default=20)
     parser.add_argument("--save-freq", type=int, default=5000)
-    parser.add_argument("--record-freq", type=int, default=5000)
+    parser.add_argument("--record-freq", type=int, default=1000)
     # parser.add_argument("--eval-freq", type=int, default=1)
     # parser.add_argument("--save-freq", type=int, default=1)
     # parser.add_argument("--record-freq", type=int, default=1)
@@ -109,6 +109,7 @@ if __name__ == "__main__":
     with open(outdir+'/setting.txt','w') as f:
         # f.writelines("fix the broken info bug\n")
         f.writelines("tirvial sac\n")
+        f.writelines("actually 0,1,2 sac\n")
         for each_arg, value in args.__dict__.items():
             f.writelines(each_arg + " : " + str(value)+"\n")
     writer = SummaryWriter(logdir=('logs/gac{}').format(datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")))
@@ -225,7 +226,7 @@ if __name__ == "__main__":
                 current_state = next_state
 
         performance_list = []
-        for i in range(action_dim):
+        for i in range(action_dim + 1):
             done = False
             current_state = env.reset()
             sum_reward = 0
@@ -233,7 +234,14 @@ if __name__ == "__main__":
                 current_state = utils.trim_state(current_state)
 
             while not done:
-                next_state, reward, done, info = step([i], current_state)
+                if i != action_dim:
+                    next_state, reward, done, info = step([i], current_state)
+                else:
+                    if args.broken_info:
+                        current_state = np.concatenate((current_state, np.ones(9)))
+                    action = agent.select_action(current_state, evaluate=True)
+                    next_state, reward, done, info = env.step(action)
+
                 if args.trim_state:
                     next_state = utils.trim_state(next_state)
                 sum_reward += reward
@@ -242,31 +250,30 @@ if __name__ == "__main__":
         performance_list = np.array(performance_list)
         minimal_index = np.where(performance_list == performance_list.min())
         minimal_index = minimal_index[0][0]
-
-        performance_list = []
-        for i in range(action_dim):
-            if i  == minimal_index:
-                performance_list.append(99999)
-                continue
-            broken_list = [minimal_index, i]
-            done = False
-            current_state = env.reset()
-            sum_reward = 0
-            if args.trim_state:
-                current_state = utils.trim_state(current_state)
-
-            while not done:
-                next_state, reward, done, info = step(broken_list, current_state)
+        if minimal_index == action_dim:
+            minimal_indexes = []
+        else:
+            performance_list = []
+            for i in range(action_dim):
+                broken_list = [minimal_index, i]
+                done = False
+                current_state = env.reset()
+                sum_reward = 0
                 if args.trim_state:
-                    next_state = utils.trim_state(next_state)
-                sum_reward += reward
-                current_state = next_state
-            performance_list.append(sum_reward)
-        performance_list = np.array(performance_list)
-        second_minimal_index = np.where(performance_list == performance_list.min())
-        second_minimal_index = second_minimal_index[0][0]
+                    current_state = utils.trim_state(current_state)
 
-        minimal_indexes = [minimal_index, second_minimal_index]
+                while not done:
+                    next_state, reward, done, info = step(broken_list, current_state)
+                    if args.trim_state:
+                        next_state = utils.trim_state(next_state)
+                    sum_reward += reward
+                    current_state = next_state
+                performance_list.append(sum_reward)
+            performance_list = np.array(performance_list)
+            second_minimal_index = np.where(performance_list == performance_list.min())
+            second_minimal_index = second_minimal_index[0][0]
+
+            minimal_indexes = [minimal_index, second_minimal_index]
 
         if i_episode % args.eval_freq == 0:
             print("-------------------------------------------")
