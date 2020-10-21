@@ -141,7 +141,7 @@ if __name__ == "__main__":
     if args.broken_info:
         joint_info = np.ones(9)
         current_state = np.concatenate((current_state, joint_info))
-    def step(adversarial_actions: int, current_state):
+    def step(adversarial_actions: list, current_state, ad_broken_angles):
         "input obs obs is processed and its broken info must be all 1s"
         "return unprocessed next_state"
         if args.broken_info:
@@ -152,13 +152,11 @@ if __name__ == "__main__":
         
         total_done = False
         reward_list = []
+
         for i in range(args.broken_timesteps):
             agent_action = agent.select_action(current_state, evaluate=True)
-            for ad_action in adversarial_actions:
-                if ad_action == 0 or ad_action == 3 or ad_action == 6:
-                    agent_action[ad_action] = random.uniform(-1, 1)
-                else:
-                    agent_action[ad_action] = random.uniform(args.broken_angle, -1)
+            for index, ad_action in enumerate(adversarial_actions):
+                agent_action[ad_action] = ad_broken_angles[index]
             next_state, reward, done, info = env.step(agent_action)
             original_next_state = next_state
             if args.trim_state:
@@ -175,6 +173,7 @@ if __name__ == "__main__":
             current_state = next_state
         avg_reward = np.array(reward_list).mean()
         return original_next_state, avg_reward, total_done, info
+        
     episode = 0
     t = 0
     agent_t = 0
@@ -186,6 +185,13 @@ if __name__ == "__main__":
     for i_episode in itertools.count(1):
         if t > args.max_timesteps:
             break
+        broken_angles = []
+        for minimal_index in minimal_indexes:
+            if minimal_index == 0 or minimal_index == 3 or minimal_index == 6:
+                broken_angles.append(random.uniform(-1, 1))
+            else:
+                broken_angles.append(random.uniform(args.broken_angle, -1))
+
         for agent_episode in range(args.agent_training_episodes):
             done = False
             " the agent training loop"
@@ -211,11 +217,8 @@ if __name__ == "__main__":
                 else:
                     original_action = agent.select_action(current_state, evaluate=False)
                 action = copy.deepcopy(original_action)
-                for minimal_index in minimal_indexes:
-                    if minimal_index == 0 or minimal_index == 3 or minimal_index == 6:
-                        action[minimal_index] = random.uniform(-1, 1)
-                    else:
-                        action[minimal_index] = random.uniform(args.broken_angle, -1)
+                for index,minimal_index in enumerate(minimal_indexes):
+                    action[minimal_index] = broken_angles[index]
                 next_state, reward, done, info = env.step(action)
                 episode_steps += 1
                 mask = 1 if episode_steps == env._max_episode_steps else float(not done)
@@ -232,16 +235,23 @@ if __name__ == "__main__":
                 current_state = next_state
 
         performance_list = []
+        first_level_dict = {}
         for i in range(action_dim + 1):
             done = False
             current_state = env.reset()
             sum_reward = 0
             if args.trim_state:
                 current_state = utils.trim_state(current_state)
-
+            if i != action_dim:
+                if i == 0 or i == 3 or i == 6:
+                    angle = random.uniform(-1,1)
+                else:
+                    angle = random.uniform(args.broken_angle, -1)
+                first_level_dict[str(i)] = angle
+                ad_broken_angles = [angle]
             while not done:
                 if i != action_dim:
-                    next_state, reward, done, info = step([i], current_state)
+                    next_state, reward, done, info = step([i], current_state, ad_broken_angles)
                 else:
                     if args.broken_info:
                         current_state = np.concatenate((current_state, np.ones(9)))
@@ -256,20 +266,27 @@ if __name__ == "__main__":
         performance_list = np.array(performance_list)
         minimal_index = np.where(performance_list == performance_list.min())
         minimal_index = minimal_index[0][0]
+        
         if minimal_index == action_dim:
             minimal_indexes = []
         else:
             performance_list = []
             for i in range(action_dim):
+                ad_broken_angles = [first_level_dict[str(minimal_index)]]
                 broken_list = [minimal_index, i]
+                if i == 0 or i == 3 or i == 6:
+                    angle = random.uniform(-1,1)
+                else:
+                    angle = random.uniform(args.broken_angle, -1)
+                ad_broken_angles.append(angle)
+
                 done = False
                 current_state = env.reset()
                 sum_reward = 0
                 if args.trim_state:
                     current_state = utils.trim_state(current_state)
-
                 while not done:
-                    next_state, reward, done, info = step(broken_list, current_state)
+                    next_state, reward, done, info = step(broken_list, current_state, ad_broken_angles)
                     if args.trim_state:
                         next_state = utils.trim_state(next_state)
                     sum_reward += reward
