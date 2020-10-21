@@ -93,32 +93,37 @@ if __name__ == "__main__":
     if args.trim_state:
         current_state = utils.trim_state(current_state)
 
-    broken_joints = [3,4,5,6,7,8] # 5 doesn't work
+    broken_joints = [8] # 5 doesn't work
 
     if args.broken_info:
         current_state = np.concatenate((current_state, np.ones(9)))
         for broken_one in broken_joints:
             current_state[original_state_dim + broken_one] = 0
+    previous_joint = np.zeros(9)
     env.render()
     sum_reward = 0
     index = 0
     episode = 0
     env._max_episode_steps = 200
+    
     with torch.no_grad():
         while True:
             if args.broken_info:
                 adversary_action = adversary.select_action(current_state[:original_state_dim], 'test')
             else:
                 adversary_action = adversary.select_action(current_state, 'test')
+            "self diagnosed module"
+            current_joint = current_state[:9]
+            diff = current_joint - previous_joint
+            diff = np.abs(diff)
+            broken_loc = np.where(diff < 0.03)
+            pdb.set_trace()
             # print(adversary_action)
             action = agent.select_action(current_state, 'test')
             index += 1
             for broken_one in broken_joints:
                 action[broken_one] = -0.6
             # action = np.ones(9) * -0.6
-            # action[4] = -0.6  # this case doesn't work, also 6,7
-            # action[1] = -0.6
-
             # action[random.randint(0,8)] = 0
             # print(adversary_action)
             # action[adversary_action[0]] = -0.6
@@ -127,8 +132,6 @@ if __name__ == "__main__":
             # cossin = current_state[9:11]
             # command = current_state[11:20]
             # other = current_state[20]
-            # print(joint)
-            # print(other)
             next_state, reward, done, info = env.step(action)
             if args.trim_state:
                 next_state = utils.trim_state(next_state)
@@ -140,11 +143,12 @@ if __name__ == "__main__":
             sum_reward += reward 
             # print(sum_reward)
             suc = info['score/success']
-            
+            previous_joint = current_joint
             current_state = next_state
             if done:
                 episode += 1
                 current_state = env.reset()
+                previous_joint = np.zeros(9)
                 if args.trim_state:
                     current_state = utils.trim_state(current_state)
                 if args.broken_info:
@@ -153,7 +157,5 @@ if __name__ == "__main__":
                     for broken_one in broken_joints:
                         current_state[original_state_dim + broken_one] = 0
                 print(sum_reward)
-                # random_list.append(sum_reward)
-                # print("episode: {}, avg: {}".format(episode, np.array(random_list).mean()))
                 sum_reward = 0
             
