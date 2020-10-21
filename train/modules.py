@@ -192,6 +192,7 @@ class MBSAC(object):
         self.outdir = outdir
         self.batch_size = args.batch_size
         self.save_freq = args.save_freq
+        self.record_freq = args.record_freq
 
         self.policy_type = args.policy
         self.target_update_interval = args.target_update_interval
@@ -310,7 +311,7 @@ class MBSAC(object):
         if self.index % self.target_update_interval == 0:
             soft_update(self.critic_target, self.critic, self.tau)
 
-        if self.writer:
+        if self.writer and self.index % self.record_freq:
             self.writer.add_scalar('loss/critic_1', qf1_loss.item(), self.index)
             self.writer.add_scalar('loss/critic_2', qf2_loss.item(), self.index)
             self.writer.add_scalar('loss/policy', policy_loss.item(), self.index)
