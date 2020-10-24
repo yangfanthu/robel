@@ -1,0 +1,27 @@
+tirvial sac
+actually 0,1,2 sac
+start_timesteps : 10000
+max_timesteps : 10000000
+eval_freq : 20
+save_freq : 5000
+record_freq : 1000
+seed : 0
+buffer_max_size : 1000000
+agent_training_episodes : 10
+restore_step : 0
+broken_timesteps : 1
+hidden_size : 512
+broken_info : True
+broken_angle : -0.5
+std : 0.1
+gamma : 0.99
+tau : 0.005
+env_name : DClawTurnFixed-v0
+policy : Gaussian
+eval : True
+alpha : 0.2
+automatic_entropy_tuning : False
+target_update_interval : 1
+lr : 0.0003
+batch_size : 256
+trim_state : False

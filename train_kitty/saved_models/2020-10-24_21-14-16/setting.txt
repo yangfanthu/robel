@@ -1,0 +1,50 @@
+pure sac
+start_timesteps : 10000
+pure sac
+max_timesteps : 10000000
+pure sac
+eval_freq : 1000
+pure sac
+save_freq : 5000
+pure sac
+record_freq : 5000
+pure sac
+seed : 0
+pure sac
+buffer_max_size : 1000000
+pure sac
+agent_training_steps : 5000
+pure sac
+restore_step : 0
+pure sac
+broken_timesteps : 1
+pure sac
+hidden_size : 512
+pure sac
+broken_info : False
+pure sac
+broken_angle : -0.6
+pure sac
+std : 0.1
+pure sac
+gamma : 0.99
+pure sac
+tau : 0.005
+pure sac
+env_name : DClawTurnFixed-v0
+pure sac
+policy : Gaussian
+pure sac
+eval : True
+pure sac
+alpha : 0.2
+pure sac
+automatic_entropy_tuning : True
+pure sac
+target_update_interval : 1
+pure sac
+lr : 0.0003
+pure sac
+batch_size : 256
+pure sac
+trim_state : False
