@@ -180,17 +180,13 @@ if __name__ == "__main__":
     adversary_t = 0
     
     done = False
-    minimal_indexes = [0,0]
+    minimal_indexes = [0, 0]
+    broken_angles = [0, 0]
     
     for i_episode in itertools.count(1):
+        assert len(minimal_indexes) == len(broken_angles)
         if t > args.max_timesteps:
             break
-        broken_angles = []
-        for minimal_index in minimal_indexes:
-            if minimal_index == 0 or minimal_index == 3 or minimal_index == 6:
-                broken_angles.append(random.uniform(-1, 1))
-            else:
-                broken_angles.append(random.uniform(args.broken_angle, -1))
 
         for agent_episode in range(args.agent_training_episodes):
             done = False
@@ -217,7 +213,7 @@ if __name__ == "__main__":
                 else:
                     original_action = agent.select_action(current_state, evaluate=False)
                 action = copy.deepcopy(original_action)
-                for index,minimal_index in enumerate(minimal_indexes):
+                for index, minimal_index in enumerate(minimal_indexes):
                     action[minimal_index] = broken_angles[index]
                 next_state, reward, done, info = env.step(action)
                 episode_steps += 1
@@ -236,6 +232,7 @@ if __name__ == "__main__":
 
         performance_list = []
         first_level_dict = {}
+        second_level_dict = {}
         for i in range(action_dim + 1):
             done = False
             current_state = env.reset()
@@ -269,6 +266,7 @@ if __name__ == "__main__":
         
         if minimal_index == action_dim:
             minimal_indexes = []
+            broken_angles = []
         else:
             performance_list = []
             for i in range(action_dim):
@@ -278,6 +276,7 @@ if __name__ == "__main__":
                     angle = random.uniform(-1,1)
                 else:
                     angle = random.uniform(args.broken_angle, -1)
+                second_level_dict[str(i)] = angle
                 ad_broken_angles.append(angle)
 
                 done = False
@@ -297,6 +296,7 @@ if __name__ == "__main__":
             second_minimal_index = second_minimal_index[0][0]
 
             minimal_indexes = [minimal_index, second_minimal_index]
+            broken_angles = [first_level_dict[str(minimal_index)], second_level_dict[str(second_minimal_index)]]
 
         if i_episode % args.eval_freq == 0:
             print("-------------------------------------------")

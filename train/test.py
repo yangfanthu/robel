@@ -26,7 +26,7 @@ if __name__ == "__main__":
                         help='whether to use broken info again in actor module to reinforce the learning')
     parser.add_argument("--save-freq", type=int, default=5000)
 
-    parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--seed", type=int, default=2)
     parser.add_argument("--buffer-max-size", type=int, default=int(1e6))
     parser.add_argument("--agent-training-episodes", type=int, default=int(2))
     parser.add_argument("--adversary-training-episodes", type=int,default=int(1))
@@ -85,8 +85,9 @@ if __name__ == "__main__":
                 writer=None,
                 outdir=None,
                 device=device)
-    agent.restore_model_for_test(2695000) #340000 good, but doesn't work on 5 and 7
-    # 410000 works for all, not so good for 5 and 7
+    agent.restore_model_for_test(1100000) 
+    #1100000 works good
+    # 660000 works good
     #trivial 225000 works perfect!!
     adversary = AdversarialDQN(original_state_dim, action_dim, device, writer=None,buffer_max_size=int(1e6))
     # adversary.restore_model(2495000)
@@ -94,7 +95,7 @@ if __name__ == "__main__":
     if args.trim_state:
         current_state = utils.trim_state(current_state)
 
-    broken_joints = [6,8] # 5 doesn't work
+    broken_joints = [7,8] # 5 doesn't work
 
     if args.broken_info:
         current_state = np.concatenate((current_state, np.ones(9)))
@@ -106,27 +107,33 @@ if __name__ == "__main__":
     index = 0
     episode = 0
     env._max_episode_steps = 200
-    
+    broken_angle_1 = random.uniform(-0.8, 0.8)
+    broken_angle_2 = random.uniform(-0.5, -1)
+    valve_angles = []
     with torch.no_grad():
         while True:
             if args.broken_info:
                 adversary_action = adversary.select_action(current_state[:original_state_dim], 'test')
             else:
                 adversary_action = adversary.select_action(current_state, 'test')
+            valve_angles.append(current_state[-10])
             "self diagnosed module"
-            current_joint = current_state[:9]
-            diff = current_joint - previous_joint
-            diff = np.abs(diff)
-            broken_loc = np.where(diff < 0.03)
-            pdb.set_trace()
+            # current_joint = current_state[:9]
+            # diff = current_joint - previous_joint
+            # diff = np.abs(diff)
+            # broken_loc = np.where(diff < 0.03)
             # print(adversary_action)
+            for broken_one in broken_joints:
+                current_state[broken_one] = 0
             action = agent.select_action(current_state, 'test')
             index += 1
             for broken_one in broken_joints:
-                action[broken_one] = -0.6
-            # action = np.ones(9) * -0.6
-            # action[random.randint(0,8)] = 0
-            # print(adversary_action)
+                if broken_one == 0 or broken_one == 3 or broken_one == 6:
+                    action[broken_one] = broken_angle_1
+                    # action[broken_one] = random.uniform(-1,1)
+                else:
+                    action[broken_one] = broken_angle_2
+                    # action[broken_one] = random.uniform(-0.5, -1)
             # action[adversary_action[0]] = -0.6
             # action[random.randint(0,8)] = 0
             # joint = current_state[:9]
@@ -144,7 +151,7 @@ if __name__ == "__main__":
             sum_reward += reward 
             # print(sum_reward)
             suc = info['score/success']
-            previous_joint = current_joint
+            # previous_joint = current_joint
             current_state = next_state
             if done:
                 episode += 1
@@ -159,4 +166,8 @@ if __name__ == "__main__":
                         current_state[original_state_dim + broken_one] = 0
                 print(sum_reward)
                 sum_reward = 0
+                valve_angles = np.array(valve_angles)
+                np.save('./valve_angles.npy', valve_angles)
+                break
+
             
