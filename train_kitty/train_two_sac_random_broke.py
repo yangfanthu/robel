@@ -51,15 +51,15 @@ def eval_policy(policy, env_name, broken_info = False, eval_episodes=3, real_rob
     print("Evaluation over {} episodes: {:.3f}".format(eval_episodes, avg_reward))
     print("---------------------------------------")
     return avg_reward
-
-env = gym.make('DKittyWalkFixed-v0')
+this_env_name = 'DKittyWalkFixed-v0'
+env = gym.make(this_env_name)
 # env = gym.make('DClawTurnFixed-v0', device_path='/dev/tty.usbserial-FT3WI485')
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-timesteps", type=int, default=int(1e4))
     # parser.add_argument("--start-timesteps", type=int, default=int(256))
     parser.add_argument("--max-timesteps", type=int, default=int(1e7))
-    parser.add_argument("--eval-freq", type=int, default=20)
+    parser.add_argument("--eval-freq", type=int, default=10)
     parser.add_argument("--save-freq", type=int, default=5000)
     parser.add_argument("--record-freq", type=int, default=1000)
     # parser.add_argument("--eval-freq", type=int, default=1)
@@ -67,7 +67,7 @@ if __name__ == "__main__":
     # parser.add_argument("--record-freq", type=int, default=1)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--buffer-max-size", type=int, default=int(1e6))
-    parser.add_argument("--agent-training-episodes", type=int, default=int(10))
+    parser.add_argument("--agent-training-episodes", type=int, default=int(2))
     parser.add_argument("--restore-step", type=int, default=0)
     parser.add_argument("--broken-timesteps", type=int, default=1)
     parser.add_argument("--hidden-size", type=int, default=512)
@@ -302,6 +302,6 @@ if __name__ == "__main__":
             print("-------------------------------------------")
             print("steps:{:07d}".format(t))
             print("episode:{:07d}".format(i_episode))
-            avg_reward = eval_policy(agent, 'DClawTurnFixed-v0', broken_info = args.broken_info)
+            avg_reward = eval_policy(agent, this_env_name, broken_info = args.broken_info)
             writer.add_scalar('/eval/avg_reward',avg_reward, i_episode)
 
