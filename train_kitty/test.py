@@ -15,13 +15,13 @@ from modules import *
 import utils
 
 if __name__ == "__main__":
-    # env = gym.make('DClawTurnFixed-v0')
-    env = gym.make('DClawTurnFixed-v0', device_path='/dev/tty.usbserial-FT3WI485')
+    env = gym.make('DKittyWalkFixed-v0')
+    # env = gym.make('DClawTurnFixed-v0', device_path='/dev/tty.usbserial-FT3WI485')
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-timesteps", type=int, default=1e4)
     parser.add_argument("--max-timesteps", type=int, default=3e6)
     parser.add_argument("--eval-freq", type = int, default = 2000)
-    parser.add_argument("--broken-info", action='store_true', default=False,
+    parser.add_argument("--broken-info", action='store_true', default=True,
                         help="whether use broken joints indice as a part of state")
     parser.add_argument("--broken-info-recap", action='store_true', default=False,
                         help='whether to use broken info again in actor module to reinforce the learning')
@@ -57,7 +57,7 @@ if __name__ == "__main__":
                         help='learning rate (default: 0.0003)')
     parser.add_argument('--batch_size', type=int, default=256, metavar='N',
                         help='batch size (default: 256)')
-    parser.add_argument('--trim-state', action="store_true", default=True)
+    parser.add_argument('--trim-state', action="store_true", default=False)
     args = parser.parse_args()
     if args.broken_info_recap:
         assert args.broken_info
@@ -65,10 +65,10 @@ if __name__ == "__main__":
     device = torch.device('cpu')
     state_dim = env.reset().shape[0]
     if args.trim_state:
-        state_dim -= 9
+        state_dim -= 12
     original_state_dim = state_dim
     if args.broken_info:
-        state_dim += 9
+        state_dim += 12
     action_dim = env.action_space.sample().shape[0]
     max_action = env.action_space.high[0]
 
@@ -78,43 +78,32 @@ if __name__ == "__main__":
                 writer=None,
                 outdir=None,
                 device=device)
-    agent.restore_model_for_test(85000) 
+    agent.restore_model_for_test(1640000) 
     # agent.restore_model_for_test(1100000) 
     #1100000 works good
     # 660000 works good
     #trivial 225000 works perfect!!
     current_state = env.reset()
-    # env.render()
+    env.render()
 
     if args.trim_state:
         current_state = utils.trim_state(current_state)
 
-    broken_joints = [5] # 5 doesn't work
+    broken_joints = [0,3] # 5 doesn't work
 
     if args.broken_info:
-        current_state = np.concatenate((current_state, np.ones(9)))
+        current_state = np.concatenate((current_state, np.ones(12)))
         for broken_one in broken_joints:
             current_state[original_state_dim + broken_one] = 0
-    previous_joint = np.zeros(9)
     sum_reward = 0
     index = 0
     episode = 0
-    env._max_episode_steps = 50
+    # env._max_episode_steps = 50
     broken_angle_1 = random.uniform(-0.8, 0.8)
-    broken_angle_2 = random.uniform(-0.5, -1)
-    valve_angles = [0]
+    broken_angle_2 = random.uniform(-0.8, -0.8)
     with torch.no_grad():
         while True:
-            if args.broken_info:
-                valve_angles.append(current_state[-10])
-            else:
-                valve_angles.append(current_state[-1])
             "self diagnosed module"
-            # current_joint = current_state[:9]
-            # diff = current_joint - previous_joint
-            # diff = np.abs(diff)
-            # broken_loc = np.where(diff < 0.03)
-            # print(adversary_action)
             for broken_one in broken_joints:
                 current_state[broken_one] = 0
             action = agent.select_action(current_state, 'test')
@@ -136,7 +125,7 @@ if __name__ == "__main__":
             if args.trim_state:
                 next_state = utils.trim_state(next_state)
             if args.broken_info:
-                next_state = np.concatenate((next_state, np.ones(9)))
+                next_state = np.concatenate((next_state, np.ones(12)))
                 for broken_one in broken_joints:
                     current_state[original_state_dim + broken_one] = 0
                     next_state[original_state_dim + broken_one] = 0
@@ -147,14 +136,12 @@ if __name__ == "__main__":
             current_state = next_state
             if done:
                 episode += 1
-                valve_angles = np.array(valve_angles)
-                np.save('./valve_angles_pure_5.npy', valve_angles)
                 current_state = env.reset()
-                previous_joint = np.zeros(9)
+                # previous_joint = np.zeros(12)
                 if args.trim_state:
                     current_state = utils.trim_state(current_state)
                 if args.broken_info:
-                    current_state = np.concatenate((current_state, np.ones(9)))
+                    current_state = np.concatenate((current_state, np.ones(12)))
                 
                     for broken_one in broken_joints:
                         current_state[original_state_dim + broken_one] = 0
