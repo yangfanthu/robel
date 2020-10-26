@@ -15,8 +15,8 @@ from modules import *
 import utils
 
 if __name__ == "__main__":
-    # env = gym.make('DClawTurnFixed-v0')
-    env = gym.make('DClawTurnFixed-v0', device_path='/dev/tty.usbserial-FT3WI485')
+    env = gym.make('DClawTurnFixed-v0')
+    # env = gym.make('DClawTurnFixed-v0', device_path='/dev/tty.usbserial-FT3WI485')
     parser = argparse.ArgumentParser()
     parser.add_argument("--start-timesteps", type=int, default=1e4)
     parser.add_argument("--max-timesteps", type=int, default=3e6)
@@ -84,12 +84,12 @@ if __name__ == "__main__":
     # 660000 works good
     #trivial 225000 works perfect!!
     current_state = env.reset()
-    # env.render()
+    env.render()
 
     if args.trim_state:
         current_state = utils.trim_state(current_state)
 
-    broken_joints = [5] # 5 doesn't work
+    broken_joints = [4,8] # 5 doesn't work
 
     if args.broken_info:
         current_state = np.concatenate((current_state, np.ones(9)))
@@ -148,7 +148,7 @@ if __name__ == "__main__":
             if done:
                 episode += 1
                 valve_angles = np.array(valve_angles)
-                np.save('./valve_angles_pure_5.npy', valve_angles)
+                # np.save('./valve_angles_pure_5.npy', valve_angles)
                 current_state = env.reset()
                 previous_joint = np.zeros(9)
                 if args.trim_state:
