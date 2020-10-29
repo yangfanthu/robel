@@ -9,6 +9,12 @@ def trim_state(current_state):
     other = current_state[20]
     output_state = np.concatenate((joint, cossin, np.array([other])), axis=0)
     return output_state
+def kitty_trim_state(current_state):
+    pose = current_state[:18]
+    q_vel = current_state[24:36]
+    output = np.concatenate((pose, q_vel))
+    return output
+
 
 class ReplayBuffer(object):
     def __init__(self, state_dim, action_dim, outdir=None, max_size=int(1e6), device=torch.device('cuda')):
